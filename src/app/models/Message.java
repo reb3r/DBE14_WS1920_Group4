@@ -65,10 +65,11 @@ public class Message implements Serializable {
     }
 
     public int compareTo(Message message) {
-        ownVectorClock = this.vectorClock;
-        foreignVectorClock = message.getVectorClock();
+        VectorClock ownVectorClock = this.vectorClock;
+        VectorClock foreignVectorClock = message.getVectorClock();
 
         // TODO: comparision
+        return -1;
     }
 
 }
