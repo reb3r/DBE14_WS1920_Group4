@@ -3,8 +3,11 @@ package app;
 public class Settings {
     // Singleton - Pattern - Foo
     private static Settings instance;
-    private Settings () {}
-    public static Settings getInstance () {
+
+    private Settings() {
+    }
+
+    public static Settings getInstance() {
         if (Settings.instance == null) {
             Settings.instance = new Settings();
         }
@@ -12,11 +15,11 @@ public class Settings {
     }
 
     // Actual Settings getter
-    public String getMulticastAddress(){
+    public String getMulticastAddress() {
         return "230.0.0.0";
     }
 
-    public int getPort(){
+    public int getPort() {
         return 4446;
     }
 

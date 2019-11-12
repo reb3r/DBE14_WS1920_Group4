@@ -10,7 +10,7 @@ public class App {
         // Start two receiver threads and save references to List
         int receiverCount = 2;
         List<MulticastReceiver> receivers = new LinkedList<MulticastReceiver>();
-        for(int i = 0; i < receiverCount; i++) {
+        for (int i = 0; i < receiverCount; i++) {
             MulticastReceiver multicastReceiver = new MulticastReceiver();
             multicastReceiver.start();
             receivers.add(multicastReceiver); // Save references to receiver threads for better times...
