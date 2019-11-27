@@ -7,7 +7,7 @@ public class Message implements Serializable {
     /**
      * Default serial for serialization
      */
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 46822L;
 
     /**
      * Message name
@@ -27,7 +27,7 @@ public class Message implements Serializable {
     /**
      * Vectorclock
      */
-    private VectorClock vectorClock;
+    transient private VectorClock vectorClock;
 
     public Message(Topic topic, String name, String content, VectorClock vectorClock) {
         this.topic = topic;
