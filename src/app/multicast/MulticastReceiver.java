@@ -12,7 +12,7 @@ import app.models.VectorClock;
 
 public class MulticastReceiver extends Thread {
     protected MulticastSocket socket = null;
-    protected byte[] buf = new byte[1024];
+    protected byte[] buf = new byte[4096];
 
     private String uuid;
 
@@ -45,11 +45,12 @@ public class MulticastReceiver extends Thread {
                     App.topics.add(topic);
                 }
 
-                // Proint message
+                // Print message
                 if (object instanceof Message) {
                     Message message = (Message) object;
                     System.out.println(
                             "Received Message: " + message.getName() + " with topic " + message.getTopic().getName());
+                    App.messages.add(message);
                 }
             }
             socket.leaveGroup(group);

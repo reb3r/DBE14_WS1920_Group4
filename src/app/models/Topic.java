@@ -26,4 +26,17 @@ public class Topic implements Serializable {
         this.name = name;
     }
 
+    /**
+     * It may be checked if this super short implementation is sufficient for this
+     * project
+     */
+    public boolean equals(Object obj) {
+        if (obj instanceof Topic) {
+            if (((Topic) obj).getName().equals(this.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }
