@@ -2,22 +2,29 @@ package app.multicast;
 
 import java.io.*;
 import java.net.*;
+import java.util.HashMap;
 
 import app.App;
 import app.Settings;
+import app.models.HoldbackQueueItem;
 import app.models.Message;
 import app.models.Request;
 import app.models.Topic;
-import app.models.VectorClock;
 
 public class MulticastReceiver extends Thread {
     protected MulticastSocket socket = null;
-    protected byte[] buf = new byte[4096];
+    protected byte[] buf = new byte[4096]; // maybe a little bit high, but memory is cheap :-)
 
     private String uuid;
 
+    // Key (Sender) - Value (Request)
+    // As each request holds an sender specific increment, missing requests can be
+    // detected by inspecting the hashmap
+    private HashMap<String, HoldbackQueueItem> holdbackQueue;
+
     public MulticastReceiver(String uuid) {
         this.uuid = uuid;
+        holdbackQueue = new HashMap<>();
     }
 
     public void run() {
@@ -29,8 +36,20 @@ public class MulticastReceiver extends Thread {
             while (true) {
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
                 socket.receive(packet);
-                byte[] received = packet.getData();
-                Object object = deserialize(received);
+                // Get the sender. Used as key in holdbackQueue.
+                String sender = ((InetSocketAddress) packet.getSocketAddress()).getAddress().toString();
+                ;// socket.getRemoteSocketAddress().toString();
+                System.out.println(sender);
+
+                // Get actual sent data
+                byte[] receivedData = packet.getData();
+
+                // Try to deserialize an Object from sent data
+                Object object = deserialize(sender, receivedData);
+
+                if (object == null) {
+                    continue;
+                }
 
                 // "End" topic
                 if (object instanceof Topic && ((Topic) object).getName().equals("end")) {
@@ -61,28 +80,44 @@ public class MulticastReceiver extends Thread {
         }
     }
 
-    private Object deserialize(byte[] received) {
+    private Object deserialize(String sender, byte[] receivedData) {
         try {
-            ByteArrayInputStream bais = new ByteArrayInputStream(received);
+            ByteArrayInputStream bais = new ByteArrayInputStream(receivedData);
             ObjectInputStream ois = new ObjectInputStream(bais);
             Object object = ois.readObject();
             ois.close();
             bais.close();
-
+            System.out.println(14);
             if (object instanceof Request) {
                 Request request = (Request) object;
-                App.requests.add(request);
-                VectorClock packedVectorClock = request.getVectorClock();
-                System.out.println("My VectorClock is before: " + App.vectorClock.toString());
-                System.out.println("Received VectorClock is " + packedVectorClock.toString());
+                // Get sequence id id request
+                int sequenceId = request.getSequenceId();
+                System.out.println("Received seq id: " + sequenceId);
 
-                VectorClock merged = VectorClock.mergeClocks(packedVectorClock, App.vectorClock);
-                merged.addOneTo(this.uuid);
-                // System.out.println("Merged VectorClock is " + merged.toString());
+                // save to holdback queue
+                HoldbackQueueItem holdbackQueueItem = holdbackQueue.get(sender);
+                // if holdbackQueueItem is null, initialize a new one
+                if (holdbackQueueItem == null) {
+                    holdbackQueueItem = new HoldbackQueueItem();
+                    holdbackQueue.put(sender, holdbackQueueItem);
+                }
 
-                App.vectorClock = merged;
-                System.out.println("My VectorClock is now: " + App.vectorClock.toString());
-                return request.getPayload();
+                if (sequenceId == this.getHighestDeliveredSequenceNumber(sender) + 1) {
+                    // Deliver request
+                    // System.out.println("deliver");
+                    return request.getPayload();
+                } else if (sequenceId > this.getHighestDeliveredSequenceNumber(sender) + 1) {
+
+                    // Save to queue list
+                    holdbackQueueItem.getReceiveRequests().add(request);
+
+                    // TODO: Request new transmit of request
+                    return null;
+                } else {
+                    // old request retransmitted
+                    // just ignore....
+                }
+                return null;
             }
             return object;
         } catch (IOException e) {
@@ -94,5 +129,15 @@ public class MulticastReceiver extends Thread {
         }
         // Return null if there was an exception
         return null;
+    }
+
+    private int getHighestDeliveredSequenceNumber(String sender) {
+        // If no queueitem for sender is there, return 0 as highest seq id.
+        if (holdbackQueue.containsKey(sender) == false) {
+            return 0;
+        }
+
+        HoldbackQueueItem holdbackQueueItem = holdbackQueue.get(sender);
+        return holdbackQueueItem.getSequenceId();
     }
 }

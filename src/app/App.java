@@ -9,17 +9,13 @@ import java.util.List;
 import java.util.UUID;
 
 import app.models.Message;
-import app.models.Request;
 import app.models.Topic;
-import app.models.VectorClock;
 import app.multicast.MulticastPublisher;
 import app.multicast.MulticastReceiver;
 
 public class App {
 
-    public static VectorClock vectorClock = new VectorClock();
-
-    public static List<Request> requests = new LinkedList<>();
+    // public static List<Request> requests = new LinkedList<>();
 
     public static List<Topic> topics = new LinkedList<>();
 
@@ -28,7 +24,6 @@ public class App {
     public static void main(String[] args) throws Exception {
         UUID uuid = UUID.randomUUID();
         System.out.println("Started with UUID " + uuid.toString());
-        App.vectorClock.set(uuid.toString(), 0);
 
         MulticastReceiver multicastReceiver = new MulticastReceiver(uuid.toString());
         multicastReceiver.start();

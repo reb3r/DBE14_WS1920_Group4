@@ -10,15 +10,18 @@ public class Request implements Serializable {
     private static final long serialVersionUID = 325212L;
 
     /**
+     * Sender specific sequence id
+     */
+    private int sequenceId;
+
+    /**
      * Payload
      */
     private Object payload;
 
-    private VectorClock vectorClock;
-
-    public Request(Object payload, VectorClock vectorClock) {
+    public Request(Object payload, int sequenceId) {
         this.payload = payload;
-        this.vectorClock = vectorClock;
+        this.sequenceId = sequenceId;
     }
 
     public Object getPayload() {
@@ -29,12 +32,12 @@ public class Request implements Serializable {
         this.payload = payload;
     }
 
-    public VectorClock getVectorClock() {
-        return this.vectorClock;
+    public int getSequenceId() {
+        return this.sequenceId;
     }
 
-    public void setVectorClock(VectorClock vectorClock) {
-        this.vectorClock = vectorClock;
+    public void setSequenceId(int sequenceId) {
+        this.sequenceId = sequenceId;
     }
 
 }
