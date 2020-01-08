@@ -100,7 +100,7 @@ public class App {
     }
 
     private static Topic topicCliChooser() throws IOException {
-        System.out.println("To which topic you want to add an message?");
+        System.out.println("To which topic do you want to add a message?");
         Iterator<Topic> it = App.topics.iterator();
         while (it.hasNext()) {
             Topic element = it.next();
