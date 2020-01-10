@@ -6,7 +6,6 @@ import java.io.InputStreamReader;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.UUID;
 
 import app.models.Message;
 import app.models.Topic;
@@ -22,13 +21,13 @@ public class App {
     public static List<Message> messages = new LinkedList<>();
 
     public static void main(String[] args) throws Exception {
-        UUID uuid = UUID.randomUUID();
-        System.out.println("Started with UUID " + uuid.toString());
-
-        MulticastReceiver multicastReceiver = new MulticastReceiver(uuid.toString());
+        MulticastReceiver multicastReceiver = new MulticastReceiver();
         multicastReceiver.start();
 
-        MulticastPublisher multicastPublisher = new MulticastPublisher(uuid.toString());
+        MulticastPublisher multicastPublisher = MulticastPublisher.getInstance();
+
+        // Test
+        multicastPublisher.unicastObject("127.0.0.1", new Topic("start"));
 
         // CLI Loop
         while (true) {

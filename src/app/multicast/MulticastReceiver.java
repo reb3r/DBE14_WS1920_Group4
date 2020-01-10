@@ -9,21 +9,19 @@ import app.Settings;
 import app.models.HoldbackQueueItem;
 import app.models.Message;
 import app.models.Request;
+import app.models.RetransmissionRequest;
 import app.models.Topic;
 
 public class MulticastReceiver extends Thread {
     protected MulticastSocket socket = null;
     protected byte[] buf = new byte[4096]; // maybe a little bit high, but memory is cheap :-)
 
-    private String uuid;
-
     // Key (Sender) - Value (Request)
     // As each request holds an sender specific increment, missing requests can be
     // detected by inspecting the hashmap
     private HashMap<String, HoldbackQueueItem> holdbackQueue;
 
-    public MulticastReceiver(String uuid) {
-        this.uuid = uuid;
+    public MulticastReceiver() {
         holdbackQueue = new HashMap<>();
     }
 
@@ -36,9 +34,8 @@ public class MulticastReceiver extends Thread {
             while (true) {
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
                 socket.receive(packet);
-                // Get the sender. Used as key in holdbackQueue.
-                String sender = ((InetSocketAddress) packet.getSocketAddress()).getAddress().toString();
-                ;// socket.getRemoteSocketAddress().toString();
+                // Get the sender. Used as key in holdbackQueue. is ip address of the sender
+                String sender = ((InetSocketAddress) packet.getSocketAddress()).getAddress().getHostAddress();
                 System.out.println(sender);
 
                 // Get actual sent data
@@ -87,7 +84,6 @@ public class MulticastReceiver extends Thread {
             Object object = ois.readObject();
             ois.close();
             bais.close();
-            System.out.println(14);
             if (object instanceof Request) {
                 Request request = (Request) object;
                 // Get sequence id id request
@@ -107,17 +103,32 @@ public class MulticastReceiver extends Thread {
                     // System.out.println("deliver");
                     return request.getPayload();
                 } else if (sequenceId > this.getHighestDeliveredSequenceNumber(sender) + 1) {
-
                     // Save to queue list
                     holdbackQueueItem.getReceiveRequests().add(request);
 
-                    // TODO: Request new transmit of request
+                    RetransmissionRequest retransmissionRequest = new RetransmissionRequest(
+                            this.getHighestDeliveredSequenceNumber(sender) + 1);
+
+                    MulticastPublisher multicastPublisher = MulticastPublisher.getInstance();
+                    // Test
+                    multicastPublisher.unicastRetransmissionRequest(sender, retransmissionRequest);
                     return null;
                 } else {
                     // old request retransmitted
                     // just ignore....
                 }
                 return null;
+            } else if (object instanceof RetransmissionRequest) {
+                // Get missing sequenceId from RetransmissionRequest
+                int sequenceId = ((RetransmissionRequest) object).getSequenceId();
+
+                System.out.println("Received RetransmissionRequest for seqId " + sequenceId);
+
+                // Get instance from publisher
+                MulticastPublisher multicastPublisher = MulticastPublisher.getInstance();
+                // Arange retransmission with publisher. there SHOULD be more error handling for
+                // faulty sequence ids
+                multicastPublisher.retransmitRequest(sequenceId);
             }
             return object;
         } catch (IOException e) {

@@ -9,6 +9,7 @@ import app.Settings;
 import app.models.Topic;
 import app.models.Message;
 import app.models.Request;
+import app.models.RetransmissionRequest;
 
 public class MulticastPublisher {
     private DatagramSocket socket;
@@ -19,10 +20,21 @@ public class MulticastPublisher {
     // List of all sent requests. Needed for later retransmissions...
     private List<Request> sentRequests;
 
-    public MulticastPublisher(String uuid) {
+    // SINGLETON-Pattern!
+    private static MulticastPublisher instance;
+
+    private MulticastPublisher() {
         // on the startup, the list is initialized empty and the sequence id is 0
         sentRequests = new LinkedList<>();
         sequenceId = 0;
+    }
+
+    // SINGLETON-Pattern!
+    public static MulticastPublisher getInstance() {
+        if (MulticastPublisher.instance == null) {
+            MulticastPublisher.instance = new MulticastPublisher();
+        }
+        return MulticastPublisher.instance;
     }
 
     /**
@@ -54,13 +66,11 @@ public class MulticastPublisher {
         // Increment sequenceId by one
         sequenceId = sequenceId + 1;
         Request request = new Request(object, sequenceId);
-        System.out.println(1);
 
         out.writeObject(request);
         this.multicast(baos.toByteArray());
         out.close();
         baos.close();
-        System.out.println(2);
         // Add request to sentRequests List
         sentRequests.add(request);
     }
@@ -79,5 +89,75 @@ public class MulticastPublisher {
         this.multicastObject(message);
     }
 
-    // TODO: Receive retransmission request and retransmit message
+    public void unicast(String address, byte[] buf) throws IOException {
+        Settings settings = Settings.getInstance();
+        socket = new DatagramSocket();
+        group = InetAddress.getByName(address); // Resolve DNS if hostname is given...
+        DatagramPacket packet = new DatagramPacket(buf, buf.length, group, settings.getPort());
+        socket.send(packet);
+        socket.close();
+    }
+
+    /**
+     * Should not be used. Only for testing...
+     * 
+     * @deprecated
+     */
+    public void unicastObject(String address, Object object) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream out = new ObjectOutputStream(baos);
+
+        // Increment sequenceId by one
+        sequenceId = sequenceId + 1;
+        Request request = new Request(object, sequenceId);
+
+        out.writeObject(request);
+        this.unicast(address, baos.toByteArray());
+        out.close();
+        baos.close();
+
+        // Add request to sentRequests List
+        sentRequests.add(request);
+    }
+
+    /**
+     * Sends an RetransmissionRequest to the address given
+     * 
+     * @param address address of the original sender
+     * @param object  the retransmissionrequest
+     * @throws IOException
+     */
+    public void unicastRetransmissionRequest(String address, RetransmissionRequest object) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream out = new ObjectOutputStream(baos);
+
+        out.writeObject(object);
+        this.unicast(address, baos.toByteArray());
+        out.close();
+        baos.close();
+    }
+
+    /**
+     * Retransmits request (specified by sequenceId) to multicast
+     * 
+     * @param sequenceId sequenceId of the to be retransmitted request
+     * @return true if request is retransmitted, false if request not found
+     * @throws IOException
+     */
+    public boolean retransmitRequest(int sequenceId) throws IOException {
+        for (Request request : sentRequests) {
+            if (request.getSequenceId() == sequenceId) {
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ObjectOutputStream out = new ObjectOutputStream(baos);
+                System.out.println("Resend Request for seqId " + sequenceId);
+                out.writeObject(request);
+                this.multicast(baos.toByteArray());
+                out.close();
+                baos.close();
+                return true;
+            }
+        }
+        System.out.println("Could not retransmit Request (not found!) for seqId " + sequenceId);
+        return false;
+    }
 }
