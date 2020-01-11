@@ -10,6 +10,7 @@ import app.models.HoldbackQueueItem;
 import app.models.Message;
 import app.models.Request;
 import app.models.RetransmissionRequest;
+import app.models.SubscriptionMessage;
 import app.models.Topic;
 
 public class MulticastReceiver extends Thread {
@@ -62,11 +63,18 @@ public class MulticastReceiver extends Thread {
                 }
 
                 // Print message
-                if (object instanceof Message) {
+                if (object instanceof Message) {                    
                     Message message = (Message) object;
-                    System.out.println(
-                            "Received Message: " + message.getName() + " with topic " + message.getTopic().getName());
-                    App.messages.add(message);
+                    if (object instanceof SubscriptionMessage){
+                        System.out.println(
+                            "Received SubscriptionMessage from Sender: " + message.getContent() + " to topic " + message.getTopic().getName());
+                    } else {
+                        System.out.println(
+                                "Received Message: " + message.getName() + " with topic " + message.getTopic().getName());
+                        if (App.subscribedTopics.contains(message.getTopic())){
+                            App.messages.add(message); // Add message only if current instance has subscribed to that topic
+                        }
+                    }
                 }
             }
             socket.leaveGroup(group);

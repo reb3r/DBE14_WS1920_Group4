@@ -3,12 +3,19 @@ package app;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import app.models.Message;
+import app.models.Neighbors;
+import app.models.SubscriptionMessage;
 import app.models.Topic;
+import app.models.Leader;
 import app.multicast.MulticastPublisher;
 import app.multicast.MulticastReceiver;
 
@@ -17,6 +24,8 @@ public class App {
     // public static List<Request> requests = new LinkedList<>();
 
     public static List<Topic> topics = new LinkedList<>();
+    public static List<Topic> subscribedTopics = new LinkedList<>();
+    public static Map<UUID, Neighbors> topicNeighbours = new HashMap<UUID, Neighbors>();
 
     public static List<Message> messages = new LinkedList<>();
 
@@ -39,6 +48,7 @@ public class App {
                 break;
             } else if ("help".equals(line)) {
                 System.out.println("'topic add' to add a new topic");
+                System.out.println("'topic subscribe' to subscribe to one of the available topics");
                 System.out.println("'topic print' to print all topics");
                 System.out.println("'message add' to add a new message to a topic");
                 System.out.println("'message print' to print messages of an choosen topic");
@@ -47,7 +57,21 @@ public class App {
             } else if ("topic add".equals(line)) {
                 System.out.print("Topics' name: ");
                 Topic topic = new Topic(getLine());
+                Leader leader = new Leader(InetAddress.getLocalHost()); //Creator of the topic declares himself as the leader
+                topic.setLeader(leader);
+                topicNeighbours.put(topic.getUUID(), null);
                 multicastPublisher.announceTopic(topic);
+            } else if ("topic subscribe".equals(line)) {
+                Topic topic;                
+                System.out.println("To which topic do you want to subscribe?");
+                do {
+                    topic = topicCliChooser(false);
+                    if (App.subscribedTopics.contains(topic)){
+                        System.out.println("You have already subscribed to the topic '" + topic.getName() + "'. Please choose another one.");
+                    }              
+                } while (App.subscribedTopics.contains(topic));
+                App.subscribedTopics.add(topic);
+                multicastPublisher.sendMessage(new SubscriptionMessage(topic, "Subscribed", InetAddress.getLocalHost().toString()));
             } else if ("topic print".equals(line)) {
                 System.out.println("Received Topics' name: ");
                 Iterator<Topic> it = App.topics.iterator();
@@ -59,7 +83,12 @@ public class App {
                     System.out.println("No topics available. Please add topic before...");
                     continue;
                 }
-                Topic topic = topicCliChooser();
+                if (App.subscribedTopics.size() < 1) {
+                    System.out.println("You are not subscribed to any available topic. Please subsrcibe to a topic before adding a message.");
+                    continue;
+                }                
+                System.out.println("To which topic do you want to add a message?");
+                Topic topic = topicCliChooser(true);
                 System.out.println("Add a new message to topic " + topic.getName() + ":");
                 System.out.print("Messages' name: ");
                 String messageName = getLine();
@@ -72,7 +101,11 @@ public class App {
                     System.out.println("No topics available. Please add topic before...");
                     continue;
                 }
-                Topic topic = topicCliChooser();
+                if (App.subscribedTopics.size() < 1) {
+                    System.out.println("You are not subscribed to any available topic. Please subsrcibe to a topic before adding a message.");
+                    continue;
+                }
+                Topic topic = topicCliChooser(true);
                 System.out.println("The " + App.messages.size() + " messages to topic " + topic.getName() + " are:");
                 Iterator<Message> it = App.messages.iterator();
                 while (it.hasNext()) {
@@ -90,7 +123,6 @@ public class App {
                 System.out.println("Did not understand that command. Use 'help' for further assistance.");
             }
         }
-
     }
 
     private static String getLine() throws IOException {
@@ -98,21 +130,27 @@ public class App {
         return buffer.readLine();
     }
 
-    private static Topic topicCliChooser() throws IOException {
-        System.out.println("To which topic do you want to add a message?");
-        Iterator<Topic> it = App.topics.iterator();
-        while (it.hasNext()) {
-            Topic element = it.next();
-            int index = App.topics.indexOf(element);
-            System.out.println(index + ": " + element.getName());
+    private static Topic topicCliChooser(Boolean chooseFromSubscribed) throws IOException {
+        List<Topic> lstTopics;
+
+        if (chooseFromSubscribed){
+            lstTopics = App.subscribedTopics;
+        } else {
+            lstTopics = App.topics;
         }
+
+        for (Topic element : lstTopics) {
+            int index = lstTopics.indexOf(element);
+            System.out.println(index + ": " + element.getName());            
+        }
+
         String indexInput = getLine();
         try {
-            Topic topic = App.topics.get(Integer.valueOf(indexInput));
+            Topic topic = lstTopics.get(Integer.valueOf(indexInput));
             return topic;
         } catch (IndexOutOfBoundsException e) {
             System.out.println("Your selection was no good. Please try again...");
-            return App.topicCliChooser();
+            return App.topicCliChooser(chooseFromSubscribed);
         }
     }
 }
