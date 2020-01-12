@@ -1,6 +1,8 @@
 package app.models;
 
 import java.io.Serializable;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 public class Request implements Serializable {
 
@@ -8,6 +10,11 @@ public class Request implements Serializable {
      * Default serial for serialization
      */
     private static final long serialVersionUID = 325212L;
+
+    /**
+     * Sender of the request
+     */
+    private InetAddress sender;
 
     /**
      * Sender specific sequence id
@@ -22,6 +29,16 @@ public class Request implements Serializable {
     public Request(Object payload, int sequenceId) {
         this.payload = payload;
         this.sequenceId = sequenceId;
+        try {
+            this.sender = InetAddress.getLocalHost();
+        } catch (UnknownHostException e) {
+            // do nothing....
+        }
+    }
+
+    public Request(Object payload, int sequenceId, InetAddress sender) {
+        this(payload, sequenceId);
+        this.sender = sender;
     }
 
     public Object getPayload() {
@@ -38,6 +55,14 @@ public class Request implements Serializable {
 
     public void setSequenceId(int sequenceId) {
         this.sequenceId = sequenceId;
+    }
+
+    public InetAddress getSender() {
+        return this.sender;
+    }
+
+    public void setSender(InetAddress sender) {
+        this.sender = sender;
     }
 
 }

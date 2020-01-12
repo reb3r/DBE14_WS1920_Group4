@@ -35,9 +35,6 @@ public class App {
 
         MulticastPublisher multicastPublisher = MulticastPublisher.getInstance();
 
-        // Test
-        multicastPublisher.unicastObject("127.0.0.1", new Topic("start"));
-
         // CLI Loop
         while (true) {
             System.out.print("Command: ");
@@ -57,21 +54,24 @@ public class App {
             } else if ("topic add".equals(line)) {
                 System.out.print("Topics' name: ");
                 Topic topic = new Topic(getLine());
-                Leader leader = new Leader(InetAddress.getLocalHost()); //Creator of the topic declares himself as the leader
+                Leader leader = new Leader(InetAddress.getLocalHost()); // Creator of the topic declares himself as the
+                                                                        // leader
                 topic.setLeader(leader);
                 topicNeighbours.put(topic.getUUID(), null);
                 multicastPublisher.announceTopic(topic);
             } else if ("topic subscribe".equals(line)) {
-                Topic topic;                
+                Topic topic;
                 System.out.println("To which topic do you want to subscribe?");
                 do {
                     topic = topicCliChooser(false);
-                    if (App.subscribedTopics.contains(topic)){
-                        System.out.println("You have already subscribed to the topic '" + topic.getName() + "'. Please choose another one.");
-                    }              
+                    if (App.subscribedTopics.contains(topic)) {
+                        System.out.println("You have already subscribed to the topic '" + topic.getName()
+                                + "'. Please choose another one.");
+                    }
                 } while (App.subscribedTopics.contains(topic));
                 App.subscribedTopics.add(topic);
-                multicastPublisher.sendMessage(new SubscriptionMessage(topic, "Subscribed", InetAddress.getLocalHost().toString()));
+                multicastPublisher.sendMessage(
+                        new SubscriptionMessage(topic, "Subscribed", InetAddress.getLocalHost().toString()));
             } else if ("topic print".equals(line)) {
                 System.out.println("Received Topics' name: ");
                 Iterator<Topic> it = App.topics.iterator();
@@ -84,9 +84,10 @@ public class App {
                     continue;
                 }
                 if (App.subscribedTopics.size() < 1) {
-                    System.out.println("You are not subscribed to any available topic. Please subsrcibe to a topic before adding a message.");
+                    System.out.println(
+                            "You are not subscribed to any available topic. Please subsrcibe to a topic before adding a message.");
                     continue;
-                }                
+                }
                 System.out.println("To which topic do you want to add a message?");
                 Topic topic = topicCliChooser(true);
                 System.out.println("Add a new message to topic " + topic.getName() + ":");
@@ -102,7 +103,8 @@ public class App {
                     continue;
                 }
                 if (App.subscribedTopics.size() < 1) {
-                    System.out.println("You are not subscribed to any available topic. Please subsrcibe to a topic before adding a message.");
+                    System.out.println(
+                            "You are not subscribed to any available topic. Please subsrcibe to a topic before adding a message.");
                     continue;
                 }
                 Topic topic = topicCliChooser(true);
@@ -133,7 +135,7 @@ public class App {
     private static Topic topicCliChooser(Boolean chooseFromSubscribed) throws IOException {
         List<Topic> lstTopics;
 
-        if (chooseFromSubscribed){
+        if (chooseFromSubscribed) {
             lstTopics = App.subscribedTopics;
         } else {
             lstTopics = App.topics;
@@ -141,7 +143,7 @@ public class App {
 
         for (Topic element : lstTopics) {
             int index = lstTopics.indexOf(element);
-            System.out.println(index + ": " + element.getName());            
+            System.out.println(index + ": " + element.getName());
         }
 
         String indexInput = getLine();
