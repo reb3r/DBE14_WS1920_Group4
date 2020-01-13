@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import app.models.Message;
-import app.models.Neighbors;
+import app.models.RightNeighbor;
 import app.models.SubscriptionMessage;
 import app.models.Topic;
 import app.models.Leader;
@@ -25,7 +25,7 @@ public class App {
 
     public static List<Topic> topics = new LinkedList<>();
     public static List<Topic> subscribedTopics = new LinkedList<>();
-    public static Map<UUID, Neighbors> topicNeighbours = new HashMap<UUID, Neighbors>();
+    public static Map<UUID, RightNeighbor> topicNeighbours = new HashMap<UUID, RightNeighbor>();
 
     public static List<Message> messages = new LinkedList<>();
 
@@ -64,26 +64,26 @@ public class App {
                 System.out.println("To which topic do you want to subscribe?");
                 do {
                     topic = topicCliChooser(false);
-                    if (App.subscribedTopics.contains(topic)) {
+                    if (subscribedTopics.contains(topic)) {
                         System.out.println("You have already subscribed to the topic '" + topic.getName()
                                 + "'. Please choose another one.");
                     }
-                } while (App.subscribedTopics.contains(topic));
-                App.subscribedTopics.add(topic);
+                } while (subscribedTopics.contains(topic));
+                subscribedTopics.add(topic);
                 multicastPublisher.sendMessage(
                         new SubscriptionMessage(topic, "Subscribed", InetAddress.getLocalHost().toString()));
             } else if ("topic print".equals(line)) {
                 System.out.println("Received Topics' name: ");
-                Iterator<Topic> it = App.topics.iterator();
+                Iterator<Topic> it = topics.iterator();
                 while (it.hasNext()) {
                     System.out.println(it.next().getName());
                 }
             } else if ("message add".equals(line)) {
-                if (App.topics.size() < 1) {
+                if (topics.size() < 1) {
                     System.out.println("No topics available. Please add topic before...");
                     continue;
                 }
-                if (App.subscribedTopics.size() < 1) {
+                if (subscribedTopics.size() < 1) {
                     System.out.println(
                             "You are not subscribed to any available topic. Please subsrcibe to a topic before adding a message.");
                     continue;
@@ -102,14 +102,14 @@ public class App {
                     System.out.println("No topics available. Please add topic before...");
                     continue;
                 }
-                if (App.subscribedTopics.size() < 1) {
+                if (subscribedTopics.size() < 1) {
                     System.out.println(
                             "You are not subscribed to any available topic. Please subsrcibe to a topic before adding a message.");
                     continue;
                 }
                 Topic topic = topicCliChooser(true);
-                System.out.println("The " + App.messages.size() + " messages to topic " + topic.getName() + " are:");
-                Iterator<Message> it = App.messages.iterator();
+                System.out.println("The " + messages.size() + " messages to topic " + topic.getName() + " are:");
+                Iterator<Message> it = messages.iterator();
                 while (it.hasNext()) {
                     Message message = it.next();
                     if (message.getTopic().equals(topic)) {
@@ -136,9 +136,9 @@ public class App {
         List<Topic> lstTopics;
 
         if (chooseFromSubscribed) {
-            lstTopics = App.subscribedTopics;
+            lstTopics = subscribedTopics;
         } else {
-            lstTopics = App.topics;
+            lstTopics = topics;
         }
 
         for (Topic element : lstTopics) {
@@ -152,7 +152,7 @@ public class App {
             return topic;
         } catch (IndexOutOfBoundsException e) {
             System.out.println("Your selection was no good. Please try again...");
-            return App.topicCliChooser(chooseFromSubscribed);
+            return topicCliChooser(chooseFromSubscribed);
         }
     }
 }

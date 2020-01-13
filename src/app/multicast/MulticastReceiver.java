@@ -7,10 +7,12 @@ import app.App;
 import app.Settings;
 import app.models.HoldbackQueue;
 import app.models.Message;
+import app.models.RightNeighbor;
 import app.models.Request;
 import app.models.RetransmissionRequest;
 import app.models.SubscriptionMessage;
 import app.models.Topic;
+import app.models.TopicNeighbor;
 
 public class MulticastReceiver extends Thread {
     protected MulticastSocket socket = null;
@@ -59,21 +61,45 @@ public class MulticastReceiver extends Thread {
                         App.topics.add(topic);
                     }
 
-                    // Print message
+                    // Process message
                     if (object instanceof Message) {
                         Message message = (Message) object;
                         if (object instanceof SubscriptionMessage) {
-                            System.out.println("Received SubscriptionMessage from Sender: " + message.getContent()
-                                    + " to topic " + message.getTopic().getName());
+                            Topic topic = message.getTopic();
+                            InetAddress localHostAdress = InetAddress.getLocalHost();
+
+                            if (topic.getLeader().getIPAdress() == localHostAdress) {
+                                System.out.println("Leader received SubscriptionMessage from sender: " + message.getContent()
+                                        + " to topic " + topic.getName());
+
+                                InetAddress subscriberAdress = InetAddress.getByName(message.getContent());       
+                                RightNeighbor rightNeighbor = App.topicNeighbours.get(topic.getUUID());
+                                
+                                App.topicNeighbours.replace(topic.getUUID(), new RightNeighbor(subscriberAdress));
+                                MulticastPublisher multicastPublisher = MulticastPublisher.getInstance();
+
+                                if (rightNeighbor != null) {
+                                    multicastPublisher.sendTopicNeighbor(subscriberAdress.toString(), new TopicNeighbor(topic, rightNeighbor));                                    
+                                }
+                                else {
+                                    multicastPublisher.sendTopicNeighbor(subscriberAdress.toString(), new TopicNeighbor(topic, new RightNeighbor(localHostAdress)));
+                                }
+                            }
                         } else {
                             System.out.println("Received Message: " + message.getName() + " with topic "
                                     + message.getTopic().getName());
                             if (App.subscribedTopics.contains(message.getTopic())) {
                                 App.messages.add(message); // Add message only if current instance has subscribed to
-                                                           // that
-                                                           // topic
+                                                           // that topic
                             }
                         }
+                    }
+                    
+                    // Set new neighbor for specific topic
+                    if (object instanceof TopicNeighbor) {
+                        TopicNeighbor topicNeighbor = (TopicNeighbor) object;  
+                        
+                        App.topicNeighbours.put(topicNeighbor.getTopic().getUUID(), topicNeighbor.getNeighbor());
                     }
                 }
             }
