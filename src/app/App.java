@@ -53,13 +53,29 @@ public class App {
                 System.out.println("'quit' to end programm");
             } else if ("topic add".equals(line)) {
                 System.out.print("Topics' name: ");
-                Topic topic = new Topic(getLine());
+
+                Topic topic;
+
+                do {                    
+                    topic = new Topic(getLine());
+
+                    if (topics.contains(topic)) {
+                        System.out.println("The name '" + topic.getName()
+                                + "' is already in use. Please choose another one.");
+                    }
+                } while (topics.contains(topic));
+
                 Leader leader = new Leader(InetAddress.getLocalHost()); // Creator of the topic declares himself as the
                                                                         // leader
                 topic.setLeader(leader);
                 topicNeighbours.put(topic.getUUID(), null);
                 multicastPublisher.announceTopic(topic);
             } else if ("topic subscribe".equals(line)) {
+                if (topics.size() < 1) {
+                    System.out.println("No topics available. Please add topic before...");
+                    continue;
+                }
+
                 Topic topic;
                 System.out.println("To which topic do you want to subscribe?");
                 do {
@@ -71,7 +87,7 @@ public class App {
                 } while (subscribedTopics.contains(topic));
                 subscribedTopics.add(topic);
                 multicastPublisher.sendMessage(
-                        new SubscriptionMessage(topic, "Subscribed", InetAddress.getLocalHost().toString()));
+                        new SubscriptionMessage(topic, "Subscribed", InetAddress.getLocalHost().getHostAddress().toString()));
             } else if ("topic print".equals(line)) {
                 System.out.println("Received Topics' name: ");
                 Iterator<Topic> it = topics.iterator();
@@ -79,15 +95,10 @@ public class App {
                     System.out.println(it.next().getName());
                 }
             } else if ("message add".equals(line)) {
-                if (topics.size() < 1) {
-                    System.out.println("No topics available. Please add topic before...");
+                if (checkTopics() == false) {
                     continue;
                 }
-                if (subscribedTopics.size() < 1) {
-                    System.out.println(
-                            "You are not subscribed to any available topic. Please subsrcibe to a topic before adding a message.");
-                    continue;
-                }
+
                 System.out.println("To which topic do you want to add a message?");
                 Topic topic = topicCliChooser(true);
                 System.out.println("Add a new message to topic " + topic.getName() + ":");
@@ -98,15 +109,10 @@ public class App {
                 Message message = new Message(topic, messageName, messageContent);
                 multicastPublisher.sendMessage(message);
             } else if ("message print".equals(line)) {
-                if (App.topics.size() < 1) {
-                    System.out.println("No topics available. Please add topic before...");
+                if (checkTopics() == false) {
                     continue;
                 }
-                if (subscribedTopics.size() < 1) {
-                    System.out.println(
-                            "You are not subscribed to any available topic. Please subsrcibe to a topic before adding a message.");
-                    continue;
-                }
+                
                 Topic topic = topicCliChooser(true);
                 System.out.println("The " + messages.size() + " messages to topic " + topic.getName() + " are:");
                 Iterator<Message> it = messages.iterator();
@@ -132,6 +138,20 @@ public class App {
         return buffer.readLine();
     }
 
+    private static boolean checkTopics() {
+        if (topics.size() < 1) {
+            System.out.println("No topics available. Please add topic before...");
+            return false;
+        }
+        if (subscribedTopics.size() < 1) {
+            System.out.println(
+                    "You are not subscribed to any available topic. Please subsrcibe to a topic before adding a message.");
+            return false;
+        }
+
+        return true;
+    }
+
     private static Topic topicCliChooser(Boolean chooseFromSubscribed) throws IOException {
         List<Topic> lstTopics;
 
@@ -140,6 +160,8 @@ public class App {
         } else {
             lstTopics = topics;
         }
+
+        if (lstTopics.isEmpty()) { return null; }
 
         for (Topic element : lstTopics) {
             int index = lstTopics.indexOf(element);
@@ -150,7 +172,7 @@ public class App {
         try {
             Topic topic = lstTopics.get(Integer.valueOf(indexInput));
             return topic;
-        } catch (IndexOutOfBoundsException e) {
+        } catch (Exception e) {
             System.out.println("Your selection was no good. Please try again...");
             return topicCliChooser(chooseFromSubscribed);
         }

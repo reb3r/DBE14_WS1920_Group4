@@ -68,7 +68,7 @@ public class MulticastReceiver extends Thread {
                             Topic topic = message.getTopic();
                             InetAddress localHostAdress = InetAddress.getLocalHost();
 
-                            if (topic.getLeader().getIPAdress() == localHostAdress) {
+                            if (topic.getLeader().getIPAdress().equals(localHostAdress)) {
                                 System.out.println("Leader received SubscriptionMessage from sender: " + message.getContent()
                                         + " to topic " + topic.getName());
 
@@ -79,10 +79,10 @@ public class MulticastReceiver extends Thread {
                                 MulticastPublisher multicastPublisher = MulticastPublisher.getInstance();
 
                                 if (rightNeighbor != null) {
-                                    multicastPublisher.sendTopicNeighbor(subscriberAdress.toString(), new TopicNeighbor(topic, rightNeighbor));                                    
+                                    multicastPublisher.sendTopicNeighbor(subscriberAdress.getHostAddress(), new TopicNeighbor(topic, rightNeighbor));                                    
                                 }
                                 else {
-                                    multicastPublisher.sendTopicNeighbor(subscriberAdress.toString(), new TopicNeighbor(topic, new RightNeighbor(localHostAdress)));
+                                    multicastPublisher.sendTopicNeighbor(subscriberAdress.getHostAddress(), new TopicNeighbor(topic, new RightNeighbor(localHostAdress)));
                                 }
                             }
                         } else {
