@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import app.Log;
 import app.multicast.MulticastPublisher;
 
 /**
@@ -60,6 +61,8 @@ public class HoldbackQueue {
             }
         } else {
             // Just ignore request which where already delivered
+            Log.debug("Throw away request from " + sender + " with seq. id " + sequenceId + " (Highest seq. id was "
+                    + highestDeliveredSequenceNumber + ")");
         }
     }
 

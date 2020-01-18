@@ -9,6 +9,7 @@ import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
 
 import app.App;
+import app.Log;
 import app.Settings;
 import app.TopicNode;
 import app.models.HoldbackQueue;
@@ -52,7 +53,7 @@ public class MulticastReceiver extends Thread {
                 socket.receive(packet);
                 // Get the sender. Used as key in holdbackQueue. is ip address of the sender
                 InetAddress sender = ((InetSocketAddress) packet.getSocketAddress()).getAddress();
-                System.out.println("Sender of request: " + sender.getHostAddress());
+                Log.debug("Received data from: " + sender.getHostAddress());
 
                 // Get actual sent data
                 byte[] receivedData = packet.getData();
@@ -67,7 +68,7 @@ public class MulticastReceiver extends Thread {
 
                     // "End" topic
                     if (object instanceof Topic && ((Topic) object).getName().equals("end")) {
-                        System.out.println("Received end topic. Ready to die now...");
+                        Log.debug("Received end topic. Ready to die now...");
                         break threadloop;
                     }
 
@@ -174,7 +175,7 @@ public class MulticastReceiver extends Thread {
                 // Get missing sequenceId from RetransmissionRequest
                 int sequenceId = ((RetransmissionRequest) object).getSequenceId();
 
-                System.out.println("Received RetransmissionRequest for seqId " + sequenceId);
+                Log.debug("Received RetransmissionRequest for seqId " + sequenceId);
 
                 // Get instance from publisher
                 MulticastPublisher multicastPublisher = MulticastPublisher.getInstance();

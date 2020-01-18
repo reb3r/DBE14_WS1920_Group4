@@ -9,6 +9,7 @@ import java.net.InetAddress;
 import java.util.LinkedList;
 import java.util.List;
 
+import app.Log;
 import app.Settings;
 import app.interfaces.MessageInterface;
 import app.models.Topic;
@@ -171,7 +172,7 @@ public class MulticastPublisher {
                 ObjectOutputStream out = new ObjectOutputStream(baos);
                 // Serialize request and retransmit via multicast (eventually many receivers
                 // missed the original message)
-                System.out.println("Resend Request for seqId " + sequenceId);
+                Log.debug("Resend Request for seqId " + sequenceId);
                 out.writeObject(request);
                 this.multicast(baos.toByteArray());
                 // Close streams
@@ -180,7 +181,7 @@ public class MulticastPublisher {
                 return true;
             }
         }
-        System.out.println("Could not retransmit Request (not found!) for seqId " + sequenceId);
+        Log.debug("Could not retransmit Request (not found!) for seqId " + sequenceId);
         return false;
     }
 }

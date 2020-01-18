@@ -27,4 +27,8 @@ public class Settings {
         return 4446;
     }
 
+    public int getLogLevel() {
+        return Log.DEBUG;
+    }
+
 }
