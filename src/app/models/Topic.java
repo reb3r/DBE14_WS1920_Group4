@@ -60,7 +60,7 @@ public class Topic implements Serializable {
      */
     public boolean equals(Object obj) {
         if (obj instanceof Topic) {
-            if (((Topic) obj).getName().equals(this.getName())) {
+            if (((Topic) obj).getUUID().equals(this.getUUID())) {
                 return true;
             }
         }

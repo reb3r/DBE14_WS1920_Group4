@@ -25,7 +25,9 @@ public class App {
 
     public static List<Topic> topics = new LinkedList<>();
     public static List<Topic> subscribedTopics = new LinkedList<>();
-    public static Map<UUID, RightNeighbor> topicNeighbours = new HashMap<UUID, RightNeighbor>();
+    
+    public static Map<UUID, TopicNode> topicNodes = new HashMap<UUID, TopicNode>(); //Save node information for each subscribed topic
+    public static Map<UUID, RightNeighbor> topicNeighbours = new HashMap<UUID, RightNeighbor>(); //Save neighbor for each subscribed topic
 
     public static List<Message> messages = new LinkedList<>();
 

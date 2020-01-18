@@ -5,8 +5,10 @@ import java.net.*;
 
 import app.App;
 import app.Settings;
+import app.TopicNode;
 import app.models.HoldbackQueue;
 import app.models.Message;
+import app.models.TopicNodeMessage;
 import app.models.RightNeighbor;
 import app.models.Request;
 import app.models.RetransmissionRequest;
@@ -15,12 +17,15 @@ import app.models.Topic;
 import app.models.TopicNeighbor;
 
 public class MulticastReceiver extends Thread {
+    private MulticastPublisher multicastPublisher; 
+
     protected MulticastSocket socket = null;
     protected byte[] buf = new byte[16384]; // maybe a little bit high, but memory is cheap :-)
 
     protected HoldbackQueue holdbackQueue;
 
     public MulticastReceiver() {
+        this.multicastPublisher = MulticastPublisher.getInstance();
         this.holdbackQueue = new HoldbackQueue();
     }
 
@@ -58,6 +63,14 @@ public class MulticastReceiver extends Thread {
                     if (object instanceof Topic) {
                         Topic topic = (Topic) object;
                         System.out.println("Received Topic: " + topic.getName());
+                        
+                        for (Topic top : App.topics) {
+                            if (top.equals(topic)) {
+                                App.topics.remove(top);
+                                break;
+                            }
+                        }                        
+                                
                         App.topics.add(topic);
                     }
 
@@ -65,8 +78,15 @@ public class MulticastReceiver extends Thread {
                     if (object instanceof Message) {
                         Message message = (Message) object;
                         if (object instanceof SubscriptionMessage) {
-                            Topic topic = message.getTopic();
+                            Topic topic = message.getTopic();                            
                             InetAddress localHostAdress = InetAddress.getLocalHost();
+
+                            //create new topicNode for leader election purposes
+                            TopicNode topicNode = App.topicNodes.put(topic.getUUID(), new TopicNode(topic));
+
+                            if (topicNode == null) {
+                                topicNode = App.topicNodes.get(topic.getUUID());
+                            }
 
                             if (topic.getLeader().getIPAdress().equals(localHostAdress)) {
                                 System.out.println("Leader received SubscriptionMessage from sender: " + message.getContent()
@@ -76,14 +96,19 @@ public class MulticastReceiver extends Thread {
                                 RightNeighbor rightNeighbor = App.topicNeighbours.get(topic.getUUID());
                                 
                                 App.topicNeighbours.replace(topic.getUUID(), new RightNeighbor(subscriberAdress));
-                                MulticastPublisher multicastPublisher = MulticastPublisher.getInstance();
-
+                                
+                                String subscriberAdressString = subscriberAdress.getHostAddress();                                
+                                //Tell new node how to join the ring
                                 if (rightNeighbor != null) {
-                                    multicastPublisher.sendTopicNeighbor(subscriberAdress.getHostAddress(), new TopicNeighbor(topic, rightNeighbor));                                    
+                                    multicastPublisher.sendTopicNeighbor(subscriberAdressString, new TopicNeighbor(topic, rightNeighbor));                                    
                                 }
                                 else {
-                                    multicastPublisher.sendTopicNeighbor(subscriberAdress.getHostAddress(), new TopicNeighbor(topic, new RightNeighbor(localHostAdress)));
+                                    multicastPublisher.sendTopicNeighbor(subscriberAdressString, new TopicNeighbor(topic, new RightNeighbor(localHostAdress)));
                                 }
+
+                                //Start leader election
+                                TopicNodeMessage nodeMessage = new TopicNodeMessage(topic, topicNode.getUUID(), false);
+                                multicastPublisher.sendMessageUnicast(subscriberAdressString, nodeMessage);
                             }
                         } else {
                             System.out.println("Received Message: " + message.getName() + " with topic "
@@ -94,7 +119,16 @@ public class MulticastReceiver extends Thread {
                             }
                         }
                     }
-                    
+
+                    // Process node message
+                    if (object instanceof TopicNodeMessage) {
+                        //Received message for leader election process
+                        TopicNodeMessage nodeMessage = (TopicNodeMessage) object;
+                        TopicNode topicNode = App.topicNodes.get(nodeMessage.getTopic().getUUID());
+
+                        topicNode.runLCR(nodeMessage, multicastPublisher);
+                    }
+
                     // Set new neighbor for specific topic
                     if (object instanceof TopicNeighbor) {
                         TopicNeighbor topicNeighbor = (TopicNeighbor) object;  

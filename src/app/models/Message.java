@@ -1,8 +1,8 @@
 package app.models;
 
-import java.io.Serializable;
+import app.interfaces.MessageInterface;
 
-public class Message implements Serializable {
+public class Message implements MessageInterface {
 
     /**
      * Default serial for serialization

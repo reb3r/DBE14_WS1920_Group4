@@ -6,9 +6,9 @@ import java.util.LinkedList;
 import java.util.List;
 
 import app.Settings;
+import app.interfaces.MessageInterface;
 import app.models.Topic;
 import app.models.TopicNeighbor;
-import app.models.Message;
 import app.models.Request;
 import app.models.RetransmissionRequest;
 
@@ -86,8 +86,15 @@ public class MulticastPublisher {
     /**
      * Send Message object as an base64 encoded serialized string over multicast
      */
-    public void sendMessage(Message message) throws IOException {
+    public void sendMessage(MessageInterface message) throws IOException {
         this.multicastObject(message);
+    }
+
+    /**
+     * Send Message object as an base64 encoded serialized string over unicast
+     */
+    public void sendMessageUnicast(String address, MessageInterface message) throws IOException {
+        this.unicastObject(address, message);
     }
 
     public void unicast(String address, byte[] buf) throws IOException {
