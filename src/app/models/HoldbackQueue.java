@@ -8,6 +8,11 @@ import java.util.Map;
 
 import app.multicast.MulticastPublisher;
 
+/**
+ * This class is the implementation of the holdback queue for many different
+ * senders. The classname may be cofusing as the actuall queues per sender are
+ * implemented in the HoldbackQueueItem
+ */
 public class HoldbackQueue {
 
     // Key (Sender) - Value (Request)
@@ -19,6 +24,14 @@ public class HoldbackQueue {
         holdbackQueue = new HashMap<>();
     }
 
+    /**
+     * Method to fill up the sender specific queues with requests as they are
+     * received
+     * 
+     * @param sender  identifier for the sender (src) of request
+     * @param request the request which is received
+     * @throws IOException
+     */
     public void push(String sender, Request request) throws IOException {
         int sequenceId = request.getSequenceId();
         System.out.println("Received seq id: " + sequenceId);
@@ -50,8 +63,15 @@ public class HoldbackQueue {
         }
     }
 
+    /**
+     * Indicates if there are more requests left which can be delivered
+     * 
+     * @param sender identifier for the sender (src) of request
+     * @return true if there could be more requests delivered
+     */
     public boolean hasMoreDeliverables(String sender) {
-        // If no queueitem for sender is there, return 0 as highest seq id.
+        // If no queueitem for sender is there, return false, as there cannot be
+        // deliverables.
         if (holdbackQueue.containsKey(sender) == false) {
             return false;
         }
@@ -73,6 +93,14 @@ public class HoldbackQueue {
         return false;
     }
 
+    /**
+     * Pops the first element of the queue and returns it if the first message is
+     * deliverable
+     * 
+     * @param sender identifier for the sender (src) of request
+     * @return Request which can be delivered otherwise null is returned
+     * @throws IOException
+     */
     public Request deliver(String sender) throws IOException {
         // Abort method if there are no deliverable requests
         if (this.hasMoreDeliverables(sender) == false) {
@@ -101,6 +129,13 @@ public class HoldbackQueue {
         return deliverableRequest;
     }
 
+    /**
+     * Helper method to get the highest delivered sequence number for a specific
+     * sender
+     * 
+     * @param sender identifier for the sender (src) of request
+     * @return the highest sequence number
+     */
     private int getHighestDeliveredSequenceNumber(String sender) {
         // If no queueitem for sender is there, return 0 as highest seq id.
         if (holdbackQueue.containsKey(sender) == false) {

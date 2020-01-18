@@ -1,7 +1,11 @@
 package app.multicast;
 
-import java.io.*;
-import java.net.*;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -13,16 +17,14 @@ import app.models.Request;
 import app.models.RetransmissionRequest;
 
 public class MulticastPublisher {
-    private DatagramSocket socket;
-    private InetAddress group;
-
     // Sequence number of the last sent request
     private int sequenceId;
     // List of all sent requests. Needed for later retransmissions...
     private List<Request> sentRequests;
 
     // SINGLETON-Pattern!
-    private static MulticastPublisher instance;
+    // See: https://en.wikipedia.org/wiki/Singleton_pattern
+    private static volatile MulticastPublisher instance;
 
     private MulticastPublisher() {
         // on the startup, the list is initialized empty and the sequence id is 0
@@ -33,7 +35,11 @@ public class MulticastPublisher {
     // SINGLETON-Pattern!
     public static MulticastPublisher getInstance() {
         if (MulticastPublisher.instance == null) {
-            MulticastPublisher.instance = new MulticastPublisher();
+            synchronized (MulticastPublisher.class) {
+                if (MulticastPublisher.instance == null) {
+                    MulticastPublisher.instance = new MulticastPublisher();
+                }
+            }
         }
         return MulticastPublisher.instance;
     }
@@ -44,10 +50,10 @@ public class MulticastPublisher {
      * @param buf bytearray of to be sent data
      * @throws IOException
      */
-    public void multicast(byte[] buf) throws IOException {
+    private void multicast(byte[] buf) throws IOException {
         Settings settings = Settings.getInstance();
-        socket = new DatagramSocket();
-        group = InetAddress.getByName(settings.getMulticastAddress());
+        DatagramSocket socket = new DatagramSocket();
+        InetAddress group = InetAddress.getByName(settings.getMulticastAddress());
         DatagramPacket packet = new DatagramPacket(buf, buf.length, group, settings.getPort());
         socket.send(packet);
         socket.close();
@@ -99,9 +105,9 @@ public class MulticastPublisher {
 
     public void unicast(String address, byte[] buf) throws IOException {
         Settings settings = Settings.getInstance();
-        socket = new DatagramSocket();
-        group = InetAddress.getByName(address); // Resolve DNS if hostname is given...
-        DatagramPacket packet = new DatagramPacket(buf, buf.length, group, settings.getPort());
+        DatagramSocket socket = new DatagramSocket();
+        InetAddress receiver = InetAddress.getByName(address); // Resolve DNS if hostname is given...
+        DatagramPacket packet = new DatagramPacket(buf, buf.length, receiver, settings.getPort());
         socket.send(packet);
         socket.close();
     }
@@ -127,7 +133,7 @@ public class MulticastPublisher {
         // Add request to sentRequests List
         sentRequests.add(request);
     }
-    
+
     public void sendTopicNeighbor(String address, TopicNeighbor topicNeighbor) throws IOException {
         unicastObject(address, topicNeighbor);
     }
@@ -145,6 +151,7 @@ public class MulticastPublisher {
 
         out.writeObject(object);
         this.unicast(address, baos.toByteArray());
+
         out.close();
         baos.close();
     }
@@ -159,11 +166,15 @@ public class MulticastPublisher {
     public boolean retransmitRequest(int sequenceId) throws IOException {
         for (Request request : sentRequests) {
             if (request.getSequenceId() == sequenceId) {
+                // Initalize streams vor serialization
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 ObjectOutputStream out = new ObjectOutputStream(baos);
+                // Serialize request and retransmit via multicast (eventually many receivers
+                // missed the original message)
                 System.out.println("Resend Request for seqId " + sequenceId);
                 out.writeObject(request);
                 this.multicast(baos.toByteArray());
+                // Close streams
                 out.close();
                 baos.close();
                 return true;

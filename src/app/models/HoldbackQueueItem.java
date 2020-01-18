@@ -3,6 +3,10 @@ package app.models;
 import java.util.LinkedList;
 import java.util.List;
 
+/**
+ * Simple datastructure to hold the actual queue implemented as lists and the
+ * highest delivered sequence number
+ */
 public class HoldbackQueueItem {
 
     /*
