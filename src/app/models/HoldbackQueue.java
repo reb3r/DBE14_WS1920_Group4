@@ -35,7 +35,7 @@ public class HoldbackQueue {
      */
     public void push(String sender, Request request) throws IOException {
         int sequenceId = request.getSequenceId();
-        System.out.println("Received seq id: " + sequenceId);
+        Log.debug("Received seq id: " + sequenceId + " in holdback queue push for sender " + sender);
 
         // save to holdback queue
         HoldbackQueueItem holdbackQueueItem = holdbackQueue.get(sender);
@@ -121,6 +121,7 @@ public class HoldbackQueue {
             deliverableRequest = requests.remove(0);
             // Set new highest delivered request id
             item.setSequenceId(deliverableRequest.getSequenceId());
+            Log.debug("Deliver request with seq. id " + deliverableRequest.getSequenceId() + " from sender " + sender);
         }
 
         // If there are more requests in the holdback queue, check if there the next is
