@@ -17,16 +17,23 @@ import app.models.Topic;
 import app.models.TopicNeighbor;
 
 public class MulticastReceiver extends Thread {
-    private MulticastPublisher multicastPublisher; 
+    private MulticastPublisher multicastPublisher;
 
     protected MulticastSocket socket = null;
     protected byte[] buf = new byte[16384]; // maybe a little bit high, but memory is cheap :-)
 
     protected HoldbackQueue holdbackQueue;
 
+    private volatile boolean exit = false;
+
     public MulticastReceiver() {
         this.multicastPublisher = MulticastPublisher.getInstance();
         this.holdbackQueue = new HoldbackQueue();
+    }
+
+    // Should mark thread to stop
+    public void stopThread() {
+        exit = true;
     }
 
     public void run() {
@@ -35,7 +42,7 @@ public class MulticastReceiver extends Thread {
             socket = new MulticastSocket(settings.getPort());
             InetAddress group = InetAddress.getByName(settings.getMulticastAddress());
             socket.joinGroup(group);
-            threadloop: while (true) {
+            threadloop: while (exit == false) {
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
                 socket.receive(packet);
                 // Get the sender. Used as key in holdbackQueue. is ip address of the sender
@@ -63,14 +70,14 @@ public class MulticastReceiver extends Thread {
                     if (object instanceof Topic) {
                         Topic topic = (Topic) object;
                         System.out.println("Received Topic: " + topic.getName());
-                        
+
                         for (Topic top : App.topics) {
                             if (top.equals(topic)) {
                                 App.topics.remove(top);
                                 break;
                             }
-                        }                        
-                                
+                        }
+
                         App.topics.add(topic);
                     }
 
@@ -78,10 +85,10 @@ public class MulticastReceiver extends Thread {
                     if (object instanceof Message) {
                         Message message = (Message) object;
                         if (object instanceof SubscriptionMessage) {
-                            Topic topic = message.getTopic();                            
+                            Topic topic = message.getTopic();
                             InetAddress localHostAdress = InetAddress.getLocalHost();
 
-                            //create new topicNode for leader election purposes
+                            // create new topicNode for leader election purposes
                             TopicNode topicNode = App.topicNodes.put(topic.getUUID(), new TopicNode(topic));
 
                             if (topicNode == null) {
@@ -89,24 +96,25 @@ public class MulticastReceiver extends Thread {
                             }
 
                             if (topic.getLeader().getIPAdress().equals(localHostAdress)) {
-                                System.out.println("Leader received SubscriptionMessage from sender: " + message.getContent()
-                                        + " to topic " + topic.getName());
+                                System.out.println("Leader received SubscriptionMessage from sender: "
+                                        + message.getContent() + " to topic " + topic.getName());
 
-                                InetAddress subscriberAdress = InetAddress.getByName(message.getContent());       
+                                InetAddress subscriberAdress = InetAddress.getByName(message.getContent());
                                 RightNeighbor rightNeighbor = App.topicNeighbours.get(topic.getUUID());
-                                
+
                                 App.topicNeighbours.replace(topic.getUUID(), new RightNeighbor(subscriberAdress));
-                                
-                                String subscriberAdressString = subscriberAdress.getHostAddress();                                
-                                //Tell new node how to join the ring
+
+                                String subscriberAdressString = subscriberAdress.getHostAddress();
+                                // Tell new node how to join the ring
                                 if (rightNeighbor != null) {
-                                    multicastPublisher.sendTopicNeighbor(subscriberAdressString, new TopicNeighbor(topic, rightNeighbor));                                    
-                                }
-                                else {
-                                    multicastPublisher.sendTopicNeighbor(subscriberAdressString, new TopicNeighbor(topic, new RightNeighbor(localHostAdress)));
+                                    multicastPublisher.sendTopicNeighbor(subscriberAdressString,
+                                            new TopicNeighbor(topic, rightNeighbor));
+                                } else {
+                                    multicastPublisher.sendTopicNeighbor(subscriberAdressString,
+                                            new TopicNeighbor(topic, new RightNeighbor(localHostAdress)));
                                 }
 
-                                //Start leader election
+                                // Start leader election
                                 TopicNodeMessage nodeMessage = new TopicNodeMessage(topic, topicNode.getUUID(), false);
                                 multicastPublisher.sendMessageUnicast(subscriberAdressString, nodeMessage);
                             }
@@ -122,7 +130,7 @@ public class MulticastReceiver extends Thread {
 
                     // Process node message
                     if (object instanceof TopicNodeMessage) {
-                        //Received message for leader election process
+                        // Received message for leader election process
                         TopicNodeMessage nodeMessage = (TopicNodeMessage) object;
                         TopicNode topicNode = App.topicNodes.get(nodeMessage.getTopic().getUUID());
 
@@ -131,8 +139,8 @@ public class MulticastReceiver extends Thread {
 
                     // Set new neighbor for specific topic
                     if (object instanceof TopicNeighbor) {
-                        TopicNeighbor topicNeighbor = (TopicNeighbor) object;  
-                        
+                        TopicNeighbor topicNeighbor = (TopicNeighbor) object;
+
                         App.topicNeighbours.put(topicNeighbor.getTopic().getUUID(), topicNeighbor.getNeighbor());
                     }
                 }

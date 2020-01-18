@@ -43,9 +43,7 @@ public class HoldbackQueue {
             // list, there must be a hole. So request the message.
             Request first = holdbackQueueItem.getReceiveRequests().get(0);
             if (highestDeliveredSequenceNumber + 1 < first.getSequenceId()) {
-                // TODO: 5 times and wait 30 seconds in between
-                this.requestRequestRetransmission(first.getSender().getHostAddress(),
-                        highestDeliveredSequenceNumber + 1);
+                this.requestRequestRetransmission(first.getSender().getHostAddress());
             }
         } else {
             // Just ignore request which where already delivered
@@ -97,8 +95,7 @@ public class HoldbackQueue {
         // If there are more requests in the holdback queue, check if there the next is
         // missing. If it is so, request the retransmission
         if (requests.size() > 0 && requests.get(0).getSequenceId() != item.getSequenceId() + 1) {
-            // TODO: 5 times and wait 30 seconds in between
-            this.requestRequestRetransmission(sender, item.getSequenceId() + 1);
+            this.requestRequestRetransmission(sender);
         }
 
         return deliverableRequest;
@@ -114,7 +111,7 @@ public class HoldbackQueue {
         return holdbackQueueItem.getSequenceId();
     }
 
-    private void requestRequestRetransmission(String sender, int sequenceId) throws IOException {
+    private void requestRequestRetransmission(String sender) throws IOException {
         RetransmissionRequest retransmissionRequest = new RetransmissionRequest(
                 this.getHighestDeliveredSequenceNumber(sender) + 1);
 

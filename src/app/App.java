@@ -25,9 +25,12 @@ public class App {
 
     public static List<Topic> topics = new LinkedList<>();
     public static List<Topic> subscribedTopics = new LinkedList<>();
-    
-    public static Map<UUID, TopicNode> topicNodes = new HashMap<UUID, TopicNode>(); //Save node information for each subscribed topic
-    public static Map<UUID, RightNeighbor> topicNeighbours = new HashMap<UUID, RightNeighbor>(); //Save neighbor for each subscribed topic
+
+    public static Map<UUID, TopicNode> topicNodes = new HashMap<UUID, TopicNode>(); // Save node information for each
+                                                                                    // subscribed topic
+    public static Map<UUID, RightNeighbor> topicNeighbours = new HashMap<UUID, RightNeighbor>(); // Save neighbor for
+                                                                                                 // each subscribed
+                                                                                                 // topic
 
     public static List<Message> messages = new LinkedList<>();
 
@@ -42,6 +45,9 @@ public class App {
             System.out.print("Command: ");
             String line = getLine();
             if ("quit".equals(line)) {
+                // Mark thread to stop
+                multicastReceiver.stopThread();
+                // Make sure the thread will go through the next iteration
                 Topic topic = new Topic("end");
                 multicastPublisher.announceTopic(topic);
                 break;
@@ -58,12 +64,12 @@ public class App {
 
                 Topic topic;
 
-                do {                    
+                do {
                     topic = new Topic(getLine());
 
                     if (topics.contains(topic)) {
-                        System.out.println("The name '" + topic.getName()
-                                + "' is already in use. Please choose another one.");
+                        System.out.println(
+                                "The name '" + topic.getName() + "' is already in use. Please choose another one.");
                     }
                 } while (topics.contains(topic));
 
@@ -88,8 +94,8 @@ public class App {
                     }
                 } while (subscribedTopics.contains(topic));
                 subscribedTopics.add(topic);
-                multicastPublisher.sendMessage(
-                        new SubscriptionMessage(topic, "Subscribed", InetAddress.getLocalHost().getHostAddress().toString()));
+                multicastPublisher.sendMessage(new SubscriptionMessage(topic, "Subscribed",
+                        InetAddress.getLocalHost().getHostAddress().toString()));
             } else if ("topic print".equals(line)) {
                 System.out.println("Received Topics' name: ");
                 Iterator<Topic> it = topics.iterator();
@@ -114,7 +120,7 @@ public class App {
                 if (checkTopics() == false) {
                     continue;
                 }
-                
+
                 Topic topic = topicCliChooser(true);
                 System.out.println("The " + messages.size() + " messages to topic " + topic.getName() + " are:");
                 Iterator<Message> it = messages.iterator();
@@ -163,7 +169,9 @@ public class App {
             lstTopics = topics;
         }
 
-        if (lstTopics.isEmpty()) { return null; }
+        if (lstTopics.isEmpty()) {
+            return null;
+        }
 
         for (Topic element : lstTopics) {
             int index = lstTopics.indexOf(element);
