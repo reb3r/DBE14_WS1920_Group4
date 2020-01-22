@@ -59,11 +59,11 @@ public class MulticastReceiver extends Thread {
                 byte[] receivedData = packet.getData();
 
                 // Try to deserialize an Object from sent data
-                deserialize(sender, receivedData);
+                String senderUuid = deserialize(sender, receivedData);
 
                 // While there are requests in the queue which are deliverable, do processing.
-                while (this.holdbackQueue.hasMoreDeliverables(sender.getHostAddress())) {
-                    Request request = this.holdbackQueue.deliver(sender.getHostAddress());
+                while (this.holdbackQueue.hasMoreDeliverables(senderUuid)) {
+                    Request request = this.holdbackQueue.deliver(senderUuid);
                     Object object = request.getPayload();
 
                     // "End" topic
@@ -159,7 +159,7 @@ public class MulticastReceiver extends Thread {
         }
     }
 
-    private void deserialize(InetAddress sender, byte[] receivedData) {
+    private String deserialize(InetAddress sender, byte[] receivedData) {
         try {
             ByteArrayInputStream bais = new ByteArrayInputStream(receivedData);
             ObjectInputStream ois = new ObjectInputStream(bais);
@@ -170,7 +170,8 @@ public class MulticastReceiver extends Thread {
                 Request request = (Request) object;
                 request.setSender(sender);
                 // push new message to the queue
-                this.holdbackQueue.push(sender.getHostAddress(), request);
+                this.holdbackQueue.push(request.getSenderUuid().toString(), request);
+                return request.getSenderUuid().toString();
             } else if (object instanceof RetransmissionRequest) {
                 // Get missing sequenceId from RetransmissionRequest
                 int sequenceId = ((RetransmissionRequest) object).getSequenceId();
@@ -190,5 +191,6 @@ public class MulticastReceiver extends Thread {
         } catch (IllegalArgumentException e) {
             System.out.println("Received string was not base64 encoded: " + e.getMessage());
         }
+        return "";
     }
 }

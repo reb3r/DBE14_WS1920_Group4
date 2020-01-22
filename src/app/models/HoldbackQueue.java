@@ -127,7 +127,7 @@ public class HoldbackQueue {
         // If there are more requests in the holdback queue, check if there the next is
         // missing. If it is so, request the retransmission
         if (requests.size() > 0 && requests.get(0).getSequenceId() != item.getSequenceId() + 1) {
-            this.requestRequestRetransmission(sender);
+            this.requestRequestRetransmission(requests.get(0).getSender().getHostAddress());
         }
 
         return deliverableRequest;

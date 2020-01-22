@@ -8,6 +8,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 
 import app.Log;
 import app.Settings;
@@ -23,6 +24,8 @@ public class MulticastPublisher {
     // List of all sent requests. Needed for later retransmissions...
     private List<Request> sentRequests;
 
+    private UUID senderUuid;
+
     // SINGLETON-Pattern!
     // See: https://en.wikipedia.org/wiki/Singleton_pattern
     private static volatile MulticastPublisher instance;
@@ -31,6 +34,7 @@ public class MulticastPublisher {
         // on the startup, the list is initialized empty and the sequence id is 0
         sentRequests = new LinkedList<>();
         sequenceId = 0;
+        senderUuid = UUID.randomUUID();
     }
 
     // SINGLETON-Pattern!
@@ -74,6 +78,7 @@ public class MulticastPublisher {
         // Increment sequenceId by one
         sequenceId = sequenceId + 1;
         Request request = new Request(object, sequenceId);
+        request.setSenderUuid(this.senderUuid);
 
         out.writeObject(request);
         this.multicast(baos.toByteArray());
@@ -125,6 +130,7 @@ public class MulticastPublisher {
         // Increment sequenceId by one
         sequenceId = sequenceId + 1;
         Request request = new Request(object, sequenceId);
+        request.setSenderUuid(this.senderUuid);
 
         out.writeObject(request);
         this.unicast(address, baos.toByteArray());
