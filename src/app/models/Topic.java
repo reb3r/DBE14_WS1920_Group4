@@ -15,6 +15,11 @@ public class Topic implements Serializable {
      */
     private UUID uuid;
 
+     /**
+     * Tells if topic is still in use or should be deleted
+     */
+    private String state = "ACTIVE";
+
     /**
      * Topics name
      */
@@ -32,6 +37,14 @@ public class Topic implements Serializable {
 
     public UUID getUUID() {
         return this.uuid;
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
+    public String getState() {
+        return this.state;
     }
 
     public void setName(UUID uuid) {

@@ -76,19 +76,26 @@ public class MulticastReceiver extends Thread {
                         break threadloop;
                     }
 
-                    // Print ordinary topic
+                    // Process topic object
                     if (object instanceof Topic) {
                         Topic topic = (Topic) object;
-                        System.out.println("Received Topic: " + topic.getName());
+                        System.out.println("Received Topic: " + topic.getName() + " in state " + topic.getState());
 
-                        for (Topic top : App.topics) {
+                        App.topics.removeIf(t -> t.equals(topic));
+
+                        for (Topic top : App.subscribedTopics) {
                             if (top.equals(topic)) {
-                                App.topics.remove(top);
-                                break;
+                                top.setName(topic.getName());
                             }
                         }
 
-                        App.topics.add(topic);
+                        if ("ACTIVE".equals(topic.getState())){
+                            App.topics.add(topic);
+                        } else {
+                            App.subscribedTopics.remove(topic);            
+                            App.topicNeighbours.remove(topic.getUUID());
+                            App.topicNodes.remove(topic.getUUID());
+                        }
                     }
 
                     // Process message
