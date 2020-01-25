@@ -13,9 +13,13 @@ import app.Log;
 import app.Settings;
 import app.TopicNode;
 import app.models.HoldbackQueue;
+import app.models.Leader;
 import app.models.Message;
+import app.models.NewTopicNeighborMessage;
 import app.models.TopicNodeMessage;
+import app.models.UnsubscriptionMessage;
 import app.models.RightNeighbor;
+import app.models.RingCompleteMessage;
 import app.models.Request;
 import app.models.RetransmissionRequest;
 import app.models.SubscriptionMessage;
@@ -94,35 +98,48 @@ public class MulticastReceiver extends Thread {
                             Topic topic = message.getTopic();
                             InetAddress localHostAdress = InetAddress.getLocalHost();
 
-                            // create new topicNode for leader election purposes
-                            TopicNode topicNode = App.topicNodes.put(topic.getUUID(), new TopicNode(topic));
-
-                            if (topicNode == null) {
-                                topicNode = App.topicNodes.get(topic.getUUID());
-                            }
-
                             if (topic.getLeader().getIPAdress().equals(localHostAdress)) {
                                 System.out.println("Leader received SubscriptionMessage from sender: "
                                         + message.getContent() + " to topic " + topic.getName());
 
                                 InetAddress subscriberAdress = InetAddress.getByName(message.getContent());
-                                RightNeighbor rightNeighbor = App.topicNeighbours.get(topic.getUUID());
 
-                                App.topicNeighbours.replace(topic.getUUID(), new RightNeighbor(subscriberAdress));
+                                RightNeighbor rightNeighbor = App.topicNeighbours.replace(topic.getUUID(), new RightNeighbor(subscriberAdress));
 
                                 String subscriberAdressString = subscriberAdress.getHostAddress();
                                 // Tell new node how to join the ring
                                 if (rightNeighbor != null) {
-                                    multicastPublisher.sendTopicNeighbor(subscriberAdressString,
+                                    multicastPublisher.sendTopicNeighborUnicast(subscriberAdressString,
                                             new TopicNeighbor(topic, rightNeighbor));
                                 } else {
-                                    multicastPublisher.sendTopicNeighbor(subscriberAdressString,
+                                    multicastPublisher.sendTopicNeighborUnicast(subscriberAdressString,
                                             new TopicNeighbor(topic, new RightNeighbor(localHostAdress)));
                                 }
+                            }
+                        } else if (object instanceof UnsubscriptionMessage) {
+                            UnsubscriptionMessage unsubscriptionMessage = (UnsubscriptionMessage) message;
+                            Topic topic = unsubscriptionMessage.getTopic();
+                            InetAddress localHostAdress = InetAddress.getLocalHost();
 
-                                // Start leader election
-                                TopicNodeMessage nodeMessage = new TopicNodeMessage(topic, topicNode.getUUID(), false);
-                                multicastPublisher.sendMessageUnicast(subscriberAdressString, nodeMessage);
+                            if (topic.getLeader().getIPAdress().equals(localHostAdress)) {
+                                System.out.println("Leader received UnsubscriptionMessage from sender: "
+                                        + unsubscriptionMessage.getContent() + " to topic " + topic.getName());
+
+                                InetAddress unsubscriberAdress = InetAddress.getByName(unsubscriptionMessage.getContent());
+                                
+                                RightNeighbor rightNeighbor = App.topicNeighbours.get(topic.getUUID());
+
+                                if (unsubscriberAdress.equals(localHostAdress) && rightNeighbor == null ) {
+                                    // last node leaves topic
+                                    App.topics.remove(topic);
+                                    continue;
+                                }
+
+                                RightNeighbor oldRightNeighbor = new RightNeighbor(unsubscriberAdress);
+                                RightNeighbor newRightNeighbor = unsubscriptionMessage.getRightNeighbor();
+
+                                // Tell the node whose neighbor is about to leave to set the neighbor of the leaving node as its new neighbor
+                                multicastPublisher.sendNewTopicNeighbor(new NewTopicNeighborMessage(topic, oldRightNeighbor, newRightNeighbor));                                
                             }
                         } else {
                             System.out.println("Received Message: " + message.getName() + " with topic "
@@ -138,16 +155,59 @@ public class MulticastReceiver extends Thread {
                     if (object instanceof TopicNodeMessage) {
                         // Received message for leader election process
                         TopicNodeMessage nodeMessage = (TopicNodeMessage) object;
+
                         TopicNode topicNode = App.topicNodes.get(nodeMessage.getTopic().getUUID());
 
                         topicNode.runLCR(nodeMessage, multicastPublisher);
                     }
 
-                    // Set new neighbor for specific topic
+                    // Process neighbor replacement message
+                    if (object instanceof NewTopicNeighborMessage) {
+                        // Received message to replace current neighbor with a new one
+                        NewTopicNeighborMessage newTopicNeighborMessage = (NewTopicNeighborMessage) object;
+                        Topic topic = newTopicNeighborMessage.getTopic();
+
+                        if (newTopicNeighborMessage.getNewRightNeighbor().getIPAdress().equals(InetAddress.getLocalHost())) {
+                            // When only two nodes are left and one leaves, the last node will receive itself as new neighbor.
+                            App.topicNeighbours.put(topic.getUUID(), null);
+                            topic.setLeader(new Leader(InetAddress.getLocalHost()));
+                        } else {
+                            // Only replace neighbor if current neighbor matches the oldRightNeighbor who is about to be replaced
+                            if (App.topicNeighbours.get(topic.getUUID()).equals(newTopicNeighborMessage.getOldRightNeighbor())) {                            
+                                App.topicNeighbours.put(topic.getUUID(), newTopicNeighborMessage.getNewRightNeighbor());
+
+                                multicastPublisher.sendMessage(new RingCompleteMessage(topic));
+                            }
+                        }
+                    }
+
+                    // Set neighbor for specific topic
                     if (object instanceof TopicNeighbor) {
                         TopicNeighbor topicNeighbor = (TopicNeighbor) object;
 
                         App.topicNeighbours.put(topicNeighbor.getTopic().getUUID(), topicNeighbor.getNeighbor());
+
+                        // notify all nodes that ring is complete
+                        multicastPublisher.sendMessage(new RingCompleteMessage(topicNeighbor.getTopic()));
+                    }
+
+                    // Process ring complete message
+                    if (object instanceof RingCompleteMessage) {
+                        // Received message that ring building is completed
+                        RingCompleteMessage ringMessage = (RingCompleteMessage) object;
+                        Topic topic = ringMessage.getTopic();                        
+
+                        // Create new topicNode for leader election purposes. If node already exists, put will return existing one.
+                        // Put will return null if put action was successful.
+                        TopicNode topicNode = App.topicNodes.put(topic.getUUID(), new TopicNode(topic));
+
+                        if (topicNode == null) {
+                            topicNode = App.topicNodes.get(topic.getUUID());
+                        }                      
+
+                        // Start leader election. Send message to right neighbor.
+                        TopicNodeMessage nodeMessage = new TopicNodeMessage(topic, topicNode.getUUID(), false);
+                        multicastPublisher.sendMessageUnicast(App.topicNeighbours.get(topic.getUUID()).getIPAdress().getHostAddress(), nodeMessage);
                     }
                 }
             }

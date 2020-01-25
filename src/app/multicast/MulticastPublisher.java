@@ -15,6 +15,7 @@ import app.Settings;
 import app.interfaces.MessageInterface;
 import app.models.Topic;
 import app.models.TopicNeighbor;
+import app.models.NewTopicNeighborMessage;
 import app.models.Request;
 import app.models.RetransmissionRequest;
 
@@ -141,8 +142,12 @@ public class MulticastPublisher {
         sentRequests.add(request);
     }
 
-    public void sendTopicNeighbor(String address, TopicNeighbor topicNeighbor) throws IOException {
+    public void sendTopicNeighborUnicast(String address, TopicNeighbor topicNeighbor) throws IOException {
         unicastObject(address, topicNeighbor);
+    }
+
+    public void sendNewTopicNeighbor(NewTopicNeighborMessage newTopicNeighborMessage) throws IOException {
+        multicastObject(newTopicNeighborMessage);
     }
 
     /**

@@ -15,6 +15,7 @@ import app.models.Message;
 import app.models.RightNeighbor;
 import app.models.SubscriptionMessage;
 import app.models.Topic;
+import app.models.UnsubscriptionMessage;
 import app.models.Leader;
 import app.multicast.MulticastPublisher;
 import app.multicast.MulticastReceiver;
@@ -75,8 +76,11 @@ public class App {
 
                 Leader leader = new Leader(InetAddress.getLocalHost()); // Creator of the topic declares himself as the
                                                                         // leader
-                topic.setLeader(leader);
+                topic.setLeader(leader);                
                 topicNeighbours.put(topic.getUUID(), null);
+                
+                subscribedTopics.add(topic); // a topic creator is automatically subscribed to the topic
+
                 multicastPublisher.announceTopic(topic);
             } else if ("topic subscribe".equals(line)) {
                 if (topics.size() < 1) {
@@ -88,14 +92,33 @@ public class App {
                 System.out.println("To which topic do you want to subscribe?");
                 do {
                     topic = topicCliChooser(false);
+
                     if (subscribedTopics.contains(topic)) {
                         System.out.println("You have already subscribed to the topic '" + topic.getName()
                                 + "'. Please choose another one.");
                     }
                 } while (subscribedTopics.contains(topic));
+                
+                if (topic == null) { continue; }
+
                 subscribedTopics.add(topic);
                 multicastPublisher.sendMessage(new SubscriptionMessage(topic, "Subscribed",
                         InetAddress.getLocalHost().getHostAddress().toString()));
+            } else if ("topic unsubscribe".equals(line)) {
+                if (subscribedTopics.size() < 1) {
+                    System.out.println("You are not subscribed to any topic.");
+                    continue;
+                }
+
+                System.out.println("From which topic do you want to unsubscribe?");
+                
+                Topic topic = topicCliChooser(true);
+
+                if (topic == null) { continue; }
+
+                subscribedTopics.remove(topic);
+                multicastPublisher.sendMessage(new UnsubscriptionMessage(topic, App.topicNeighbours.get(topic.getUUID()),
+                        "Unsubscribed", InetAddress.getLocalHost().getHostAddress()));
             } else if ("topic print".equals(line)) {
                 System.out.println("Received Topics' name: ");
                 Iterator<Topic> it = topics.iterator();
@@ -109,6 +132,9 @@ public class App {
 
                 System.out.println("To which topic do you want to add a message?");
                 Topic topic = topicCliChooser(true);
+
+                if (topic == null) { continue; }
+
                 System.out.println("Add a new message to topic " + topic.getName() + ":");
                 System.out.print("Messages' name: ");
                 String messageName = getLine();
@@ -122,6 +148,9 @@ public class App {
                 }
 
                 Topic topic = topicCliChooser(true);
+
+                if (topic == null) { continue; }
+
                 System.out.println("The " + messages.size() + " messages to topic " + topic.getName() + " are:");
                 Iterator<Message> it = messages.iterator();
                 while (it.hasNext()) {
@@ -173,12 +202,18 @@ public class App {
             return null;
         }
 
+        System.out.println("-1: exit selection");
+
         for (Topic element : lstTopics) {
             int index = lstTopics.indexOf(element);
             System.out.println(index + ": " + element.getName());
         }
 
         String indexInput = getLine();
+        if ("-1".equals(indexInput)){
+            return null;
+        }
+
         try {
             Topic topic = lstTopics.get(Integer.valueOf(indexInput));
             return topic;

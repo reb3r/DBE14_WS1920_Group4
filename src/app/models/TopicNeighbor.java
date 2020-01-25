@@ -12,7 +12,7 @@ public class TopicNeighbor implements Serializable {
     private static final long serialVersionUID = -3718386399221704017L;
 
     /**
-     * IP adress of right neighbor
+     * Topic to witch the neighbor belongs
      */
     private Topic topic;
 
