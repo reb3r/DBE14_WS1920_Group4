@@ -2,14 +2,18 @@ package app;
 
 public class Settings {
     // Singleton - Pattern - Foo
-    private static Settings instance;
+    private static volatile Settings instance;
 
     private Settings() {
     }
 
     public static Settings getInstance() {
         if (Settings.instance == null) {
-            Settings.instance = new Settings();
+            synchronized (Settings.class) {
+                if (Settings.instance == null) {
+                    Settings.instance = new Settings();
+                }
+            }
         }
         return Settings.instance;
     }
@@ -21,6 +25,10 @@ public class Settings {
 
     public int getPort() {
         return 4446;
+    }
+
+    public int getLogLevel() {
+        return Log.DEBUG;
     }
 
 }

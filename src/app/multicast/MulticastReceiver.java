@@ -1,23 +1,49 @@
 package app.multicast;
 
-import java.io.*;
-import java.net.*;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.MulticastSocket;
 
 import app.App;
+import app.Log;
 import app.Settings;
+import app.TopicNode;
+import app.models.HoldbackQueue;
+import app.models.Leader;
 import app.models.Message;
+import app.models.NewTopicNeighborMessage;
+import app.models.TopicNodeMessage;
+import app.models.UnsubscriptionMessage;
+import app.models.RightNeighbor;
+import app.models.RingCompleteMessage;
 import app.models.Request;
+import app.models.RetransmissionRequest;
+import app.models.SubscriptionMessage;
 import app.models.Topic;
-import app.models.VectorClock;
+import app.models.TopicNeighbor;
 
 public class MulticastReceiver extends Thread {
+    private MulticastPublisher multicastPublisher;
+
     protected MulticastSocket socket = null;
-    protected byte[] buf = new byte[1024];
+    protected byte[] buf = new byte[16384]; // maybe a little bit high, but memory is cheap :-)
 
-    private String uuid;
+    protected HoldbackQueue holdbackQueue;
 
-    public MulticastReceiver(String uuid) {
-        this.uuid = uuid;
+    private volatile boolean exit = false;
+
+    public MulticastReceiver() {
+        this.multicastPublisher = MulticastPublisher.getInstance();
+        this.holdbackQueue = new HoldbackQueue();
+    }
+
+    // Should mark thread to stop
+    public void stopThread() {
+        exit = true;
     }
 
     public void run() {
@@ -26,30 +52,170 @@ public class MulticastReceiver extends Thread {
             socket = new MulticastSocket(settings.getPort());
             InetAddress group = InetAddress.getByName(settings.getMulticastAddress());
             socket.joinGroup(group);
-            while (true) {
+            threadloop: while (exit == false) {
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
                 socket.receive(packet);
-                byte[] received = packet.getData();
-                Object object = deserialize(received);
+                // Get the sender. Used as key in holdbackQueue. is ip address of the sender
+                InetAddress sender = ((InetSocketAddress) packet.getSocketAddress()).getAddress();
+                Log.debug("Received data from: " + sender.getHostAddress());
 
-                // "End" topic
-                if (object instanceof Topic && ((Topic) object).getName().equals("end")) {
-                    System.out.println("Received end topic. Ready to die now...");
-                    break;
-                }
+                // Get actual sent data
+                byte[] receivedData = packet.getData();
 
-                // Print ordinary topic
-                if (object instanceof Topic) {
-                    Topic topic = (Topic) object;
-                    System.out.println("Received Topic: " + topic.getName());
-                    App.topics.add(topic);
-                }
+                // Try to deserialize an Object from sent data
+                String senderUuid = deserialize(sender, receivedData);
 
-                // Proint message
-                if (object instanceof Message) {
-                    Message message = (Message) object;
-                    System.out.println(
-                            "Received Message: " + message.getName() + " with topic " + message.getTopic().getName());
+                // While there are requests in the queue which are deliverable, do processing.
+                while (this.holdbackQueue.hasMoreDeliverables(senderUuid)) {
+                    Request request = this.holdbackQueue.deliver(senderUuid);
+                    Object object = request.getPayload();
+
+                    // "End" topic
+                    if (object instanceof Topic && ((Topic) object).getName().equals("end")) {
+                        Log.debug("Received end topic. Ready to die now...");
+                        break threadloop;
+                    }
+
+                    // Process topic object
+                    if (object instanceof Topic) {
+                        Topic topic = (Topic) object;
+                        System.out.println("Received Topic: " + topic.getName() + " in state " + topic.getState());
+
+                        App.topics.removeIf(t -> t.equals(topic));
+
+                        for (Topic top : App.subscribedTopics) {
+                            if (top.equals(topic)) {
+                                top.setName(topic.getName());
+                            }
+                        }
+
+                        if ("ACTIVE".equals(topic.getState())){
+                            App.topics.add(topic);
+                        } else {
+                            App.subscribedTopics.remove(topic);            
+                            App.topicNeighbours.remove(topic.getUUID());
+                            App.topicNodes.remove(topic.getUUID());
+                        }
+                    }
+
+                    // Process message
+                    if (object instanceof Message) {
+                        Message message = (Message) object;
+                        if (object instanceof SubscriptionMessage) {
+                            Topic topic = message.getTopic();
+                            InetAddress localHostAdress = InetAddress.getLocalHost();
+
+                            if (topic.getLeader().getIPAdress().equals(localHostAdress)) {
+                                System.out.println("Leader received SubscriptionMessage from sender: "
+                                        + message.getContent() + " to topic " + topic.getName());
+
+                                InetAddress subscriberAdress = InetAddress.getByName(message.getContent());
+
+                                RightNeighbor rightNeighbor = App.topicNeighbours.replace(topic.getUUID(), new RightNeighbor(subscriberAdress));
+
+                                String subscriberAdressString = subscriberAdress.getHostAddress();
+                                // Tell new node how to join the ring
+                                if (rightNeighbor != null) {
+                                    multicastPublisher.sendTopicNeighborUnicast(subscriberAdressString,
+                                            new TopicNeighbor(topic, rightNeighbor));
+                                } else {
+                                    multicastPublisher.sendTopicNeighborUnicast(subscriberAdressString,
+                                            new TopicNeighbor(topic, new RightNeighbor(localHostAdress)));
+                                }
+                            }
+                        } else if (object instanceof UnsubscriptionMessage) {
+                            UnsubscriptionMessage unsubscriptionMessage = (UnsubscriptionMessage) message;
+                            Topic topic = unsubscriptionMessage.getTopic();
+                            InetAddress localHostAdress = InetAddress.getLocalHost();
+
+                            if (topic.getLeader().getIPAdress().equals(localHostAdress)) {
+                                System.out.println("Leader received UnsubscriptionMessage from sender: "
+                                        + unsubscriptionMessage.getContent() + " to topic " + topic.getName());
+
+                                InetAddress unsubscriberAdress = InetAddress.getByName(unsubscriptionMessage.getContent());
+                                
+                                RightNeighbor rightNeighbor = App.topicNeighbours.get(topic.getUUID());
+
+                                if (unsubscriberAdress.equals(localHostAdress) && rightNeighbor == null ) {
+                                    // last node leaves topic
+                                    App.topics.remove(topic);
+                                    continue;
+                                }
+
+                                RightNeighbor oldRightNeighbor = new RightNeighbor(unsubscriberAdress);
+                                RightNeighbor newRightNeighbor = unsubscriptionMessage.getRightNeighbor();
+
+                                // Tell the node whose neighbor is about to leave to set the neighbor of the leaving node as its new neighbor
+                                multicastPublisher.sendNewTopicNeighbor(new NewTopicNeighborMessage(topic, oldRightNeighbor, newRightNeighbor));                                
+                            }
+                        } else {
+                            System.out.println("Received Message: " + message.getName() + " with topic "
+                                    + message.getTopic().getName());
+                            if (App.subscribedTopics.contains(message.getTopic())) {
+                                App.messages.add(message); // Add message only if current instance has subscribed to
+                                                           // that topic
+                            }
+                        }
+                    }
+
+                    // Process node message
+                    if (object instanceof TopicNodeMessage) {
+                        // Received message for leader election process
+                        TopicNodeMessage nodeMessage = (TopicNodeMessage) object;
+
+                        TopicNode topicNode = App.topicNodes.get(nodeMessage.getTopic().getUUID());
+
+                        topicNode.runLCR(nodeMessage, multicastPublisher);
+                    }
+
+                    // Process neighbor replacement message
+                    if (object instanceof NewTopicNeighborMessage) {
+                        // Received message to replace current neighbor with a new one
+                        NewTopicNeighborMessage newTopicNeighborMessage = (NewTopicNeighborMessage) object;
+                        Topic topic = newTopicNeighborMessage.getTopic();
+
+                        if (newTopicNeighborMessage.getNewRightNeighbor().getIPAdress().equals(InetAddress.getLocalHost())) {
+                            // When only two nodes are left and one leaves, the last node will receive itself as new neighbor.
+                            App.topicNeighbours.put(topic.getUUID(), null);
+                            topic.setLeader(new Leader(InetAddress.getLocalHost()));
+                        } else {
+                            // Only replace neighbor if current neighbor matches the oldRightNeighbor who is about to be replaced
+                            if (App.topicNeighbours.get(topic.getUUID()).equals(newTopicNeighborMessage.getOldRightNeighbor())) {                            
+                                App.topicNeighbours.put(topic.getUUID(), newTopicNeighborMessage.getNewRightNeighbor());
+
+                                multicastPublisher.sendMessage(new RingCompleteMessage(topic));
+                            }
+                        }
+                    }
+
+                    // Set neighbor for specific topic
+                    if (object instanceof TopicNeighbor) {
+                        TopicNeighbor topicNeighbor = (TopicNeighbor) object;
+
+                        App.topicNeighbours.put(topicNeighbor.getTopic().getUUID(), topicNeighbor.getNeighbor());
+
+                        // notify all nodes that ring is complete
+                        multicastPublisher.sendMessage(new RingCompleteMessage(topicNeighbor.getTopic()));
+                    }
+
+                    // Process ring complete message
+                    if (object instanceof RingCompleteMessage) {
+                        // Received message that ring building is completed
+                        RingCompleteMessage ringMessage = (RingCompleteMessage) object;
+                        Topic topic = ringMessage.getTopic();                        
+
+                        // Create new topicNode for leader election purposes. If node already exists, put will return existing one.
+                        // Put will return null if put action was successful.
+                        TopicNode topicNode = App.topicNodes.put(topic.getUUID(), new TopicNode(topic));
+
+                        if (topicNode == null) {
+                            topicNode = App.topicNodes.get(topic.getUUID());
+                        }                      
+
+                        // Start leader election. Send message to right neighbor.
+                        TopicNodeMessage nodeMessage = new TopicNodeMessage(topic, topicNode.getUUID(), false);
+                        multicastPublisher.sendMessageUnicast(App.topicNeighbours.get(topic.getUUID()).getIPAdress().getHostAddress(), nodeMessage);
+                    }
                 }
             }
             socket.leaveGroup(group);
@@ -60,30 +226,31 @@ public class MulticastReceiver extends Thread {
         }
     }
 
-    private Object deserialize(byte[] received) {
+    private String deserialize(InetAddress sender, byte[] receivedData) {
         try {
-            ByteArrayInputStream bais = new ByteArrayInputStream(received);
+            ByteArrayInputStream bais = new ByteArrayInputStream(receivedData);
             ObjectInputStream ois = new ObjectInputStream(bais);
             Object object = ois.readObject();
             ois.close();
             bais.close();
-
             if (object instanceof Request) {
                 Request request = (Request) object;
-                App.requests.add(request);
-                VectorClock packedVectorClock = request.getVectorClock();
-                System.out.println("My VectorClock is before: " + App.vectorClock.toString());
-                System.out.println("Received VectorClock is " + packedVectorClock.toString());
+                request.setSender(sender);
+                // push new message to the queue
+                this.holdbackQueue.push(request.getSenderUuid().toString(), request);
+                return request.getSenderUuid().toString();
+            } else if (object instanceof RetransmissionRequest) {
+                // Get missing sequenceId from RetransmissionRequest
+                int sequenceId = ((RetransmissionRequest) object).getSequenceId();
 
-                VectorClock merged = VectorClock.mergeClocks(packedVectorClock, App.vectorClock);
-                merged.addOneTo(this.uuid);
-                // System.out.println("Merged VectorClock is " + merged.toString());
+                Log.debug("Received RetransmissionRequest for seqId " + sequenceId);
 
-                App.vectorClock = merged;
-                System.out.println("My VectorClock is now: " + App.vectorClock.toString());
-                return request.getPayload();
+                // Get instance from publisher
+                MulticastPublisher multicastPublisher = MulticastPublisher.getInstance();
+                // Arange retransmission with publisher. there SHOULD be more error handling for
+                // faulty sequence ids
+                multicastPublisher.retransmitRequest(sequenceId);
             }
-            return object;
         } catch (IOException e) {
             System.out.println("IOException while deserzialize: " + e);
         } catch (ClassNotFoundException e) {
@@ -91,7 +258,6 @@ public class MulticastReceiver extends Thread {
         } catch (IllegalArgumentException e) {
             System.out.println("Received string was not base64 encoded: " + e.getMessage());
         }
-        // Return null if there was an exception
-        return null;
+        return "";
     }
 }

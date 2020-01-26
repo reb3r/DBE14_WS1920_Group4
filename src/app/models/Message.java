@@ -1,8 +1,8 @@
 package app.models;
 
-import java.io.Serializable;
+import app.interfaces.MessageInterface;
 
-public class Message implements Serializable {
+public class Message implements MessageInterface {
 
     /**
      * Default serial for serialization
@@ -24,16 +24,10 @@ public class Message implements Serializable {
      */
     private Topic topic;
 
-    /**
-     * Vectorclock
-     */
-    transient private VectorClock vectorClock;
-
-    public Message(Topic topic, String name, String content, VectorClock vectorClock) {
+    public Message(Topic topic, String name, String content) {
         this.topic = topic;
         this.name = name;
         this.content = content;
-        this.vectorClock = vectorClock;
     }
 
     public String getName() {
@@ -59,17 +53,4 @@ public class Message implements Serializable {
     public void setTopic(Topic topic) {
         this.topic = topic;
     }
-
-    public VectorClock getVectorClock() {
-        return this.vectorClock;
-    }
-
-    public int compareTo(Message message) {
-        VectorClock ownVectorClock = this.vectorClock;
-        VectorClock foreignVectorClock = message.getVectorClock();
-
-        // TODO: comparision
-        return -1;
-    }
-
 }
