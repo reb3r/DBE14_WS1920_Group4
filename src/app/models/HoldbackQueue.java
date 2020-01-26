@@ -57,7 +57,7 @@ public class HoldbackQueue {
             // list, there must be a hole. So request the message.
             Request first = holdbackQueueItem.getReceiveRequests().get(0);
             if (highestDeliveredSequenceNumber + 1 < first.getSequenceId()) {
-                this.requestRequestRetransmission(first.getSender().getHostAddress());
+                this.requestRequestRetransmission(sender);
             }
         } else {
             // Just ignore request which where already delivered
@@ -127,7 +127,7 @@ public class HoldbackQueue {
         // If there are more requests in the holdback queue, check if there the next is
         // missing. If it is so, request the retransmission
         if (requests.size() > 0 && requests.get(0).getSequenceId() != item.getSequenceId() + 1) {
-            this.requestRequestRetransmission(requests.get(0).getSender().getHostAddress());
+            this.requestRequestRetransmission(sender);
         }
 
         return deliverableRequest;
@@ -154,8 +154,13 @@ public class HoldbackQueue {
         RetransmissionRequest retransmissionRequest = new RetransmissionRequest(
                 this.getHighestDeliveredSequenceNumber(sender) + 1);
 
+        // Get sender IP. There MUST be one received request. just use IP from that
+        // request...
+        HoldbackQueueItem item = this.holdbackQueue.get(sender);
+        String senderIp = item.getReceiveRequests().get(0).getSender().getHostAddress();
+
         MulticastPublisher multicastPublisher = MulticastPublisher.getInstance();
-        multicastPublisher.unicastRetransmissionRequest(sender, retransmissionRequest);
+        multicastPublisher.unicastRetransmissionRequest(senderIp, retransmissionRequest);
     }
 
 }
