@@ -135,7 +135,10 @@ public class MulticastReceiver extends Thread {
                         } else if (object instanceof UnsubscriptionMessage) {
                             UnsubscriptionMessage unsubscriptionMessage = (UnsubscriptionMessage) message;
                             Topic topic = unsubscriptionMessage.getTopic();
-                            InetAddress localHostAdress = InetAddress.getLocalHost();
+
+                            Socket s = new Socket("www.google.com", 80);
+                            InetAddress localHostAdress = s.getLocalAddress();
+                            s.close();
 
                             if (topic.getLeader().getIPAdress().equals(localHostAdress)) {
                                 System.out.println("Leader received UnsubscriptionMessage from sender: "
@@ -178,8 +181,12 @@ public class MulticastReceiver extends Thread {
                             if (currentLeftNeighbor.getIPAdress().equals(failedNeighborAdress)) {
                                 App.leftTopicNeighbours.replace(topic.getUUID(), currentLeftNeighbor, new LeftNeighbor(heartbeatSenderAdress));
 
+                                Socket s = new Socket("www.google.com", 80);
+                                InetAddress localHostAdress = s.getLocalAddress();
+                                s.close();
+
                                 multicastPublisher.sendTopicNeighborUnicast(heartbeatSenderAdress.getHostAddress(),
-                                        new TopicNeighbor(topic, new RightNeighbor(InetAddress.getLocalHost()), new LeftNeighbor(null)));
+                                        new TopicNeighbor(topic, new RightNeighbor(localHostAdress), new LeftNeighbor(null)));
                             }
                         } else {
                             System.out.println("Received Message: " + message.getName() + " with topic "
