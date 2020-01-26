@@ -150,6 +150,13 @@ public class HoldbackQueue {
         return holdbackQueueItem.getSequenceId();
     }
 
+    /**
+     * Requests retransmission if an message from the sender according to a specific
+     * sequence id
+     * 
+     * @param sender identifier for the sender (src) of request
+     * @throws IOException
+     */
     private void requestRequestRetransmission(String sender) throws IOException {
         RetransmissionRequest retransmissionRequest = new RetransmissionRequest(
                 this.getHighestDeliveredSequenceNumber(sender) + 1);

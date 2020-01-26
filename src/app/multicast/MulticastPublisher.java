@@ -89,14 +89,14 @@ public class MulticastPublisher {
     }
 
     /**
-     * Send Topic object as an base64 encoded serialized string over multicast
+     * Send Topic object as serialized string over multicast
      */
     public void announceTopic(Topic topic) throws IOException {
         this.multicastObject(topic);
     }
 
     /**
-     * Send Message object as an base64 encoded serialized string over multicast
+     * Send Message object as serialized string over multicast
      */
     public void sendMessage(MessageInterface message) throws IOException {
         this.multicastObject(message);
