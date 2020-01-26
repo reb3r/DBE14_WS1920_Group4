@@ -82,7 +82,7 @@ public class App {
                     }
                 } while (existsTopicWithName(topicName));
 
-                Leader leader = new Leader(InetAddress.getLocalHost()); // Creator of the topic declares himself as the
+                Leader leader = new Leader(IPAdress.getLocalIPAddress()); // Creator of the topic declares himself as the
                                                                         // leader
 
                 Topic topic = new Topic(topicName);                
@@ -103,15 +103,16 @@ public class App {
                 }
 
                 Topic topic;
+                InetAddress localHostAddress = IPAdress.getLocalIPAddress();
                 System.out.println("Which topic do you want to delete?");
                 do {
                     topic = topicCliChooser(true);
 
-                    if (topic != null && topic.getLeader().getIPAdress().equals(InetAddress.getLocalHost()) == false) {
+                    if (topic != null && topic.getLeader().getIPAdress().equals(localHostAddress) == false) {
                         System.out.println("You are not the leader of the topic '" + topic.getName()
                                 + "'. You can only delete a topic as a leader. Please choose another one.");
                     }
-                } while (topic != null && topic.getLeader().getIPAdress().equals(InetAddress.getLocalHost()) == false);
+                } while (topic != null && topic.getLeader().getIPAdress().equals(localHostAddress) == false);
                 
                 if (topic == null) { continue; }
 
@@ -125,15 +126,16 @@ public class App {
                 }
 
                 Topic topic;
+                InetAddress localHostAddress = IPAdress.getLocalIPAddress();
                 System.out.println("Which topic do you want to rename?");
                 do {
                     topic = topicCliChooser(true);
 
-                    if (topic != null && topic.getLeader().getIPAdress().equals(InetAddress.getLocalHost()) == false) {
+                    if (topic != null && topic.getLeader().getIPAdress().equals(localHostAddress) == false) {
                         System.out.println("You are not the leader of the topic '" + topic.getName()
                                 + "'. You can only modify a topic as a leader. Please choose another one.");
                     }
-                } while (topic != null && topic.getLeader().getIPAdress().equals(InetAddress.getLocalHost()) == false);
+                } while (topic != null && topic.getLeader().getIPAdress().equals(localHostAddress) == false);
                 
                 if (topic == null) { continue; }                
                 
@@ -173,7 +175,7 @@ public class App {
 
                 subscribedTopics.add(topic);
                 multicastPublisher.sendMessage(new SubscriptionMessage(topic, "Subscribed",
-                        InetAddress.getLocalHost().getHostAddress().toString()));
+                        IPAdress.getLocalIPAddress().getHostAddress()));
             } else if ("topic unsubscribe".equals(line)) {
                 if (subscribedTopics.size() < 1) {
                     System.out.println("You are not subscribed to any topic.");
@@ -190,7 +192,7 @@ public class App {
                 RightNeighbor rightNeighbor = App.rightTopicNeighbours.get(topic.getUUID());
                 LeftNeighbor leftNeighbor = App.leftTopicNeighbours.get(topic.getUUID());
                 multicastPublisher.sendMessage(new UnsubscriptionMessage(topic, rightNeighbor, leftNeighbor,
-                            "Unsubscribed", InetAddress.getLocalHost().getHostAddress()));
+                            "Unsubscribed", IPAdress.getLocalIPAddress().getHostAddress()));
             } else if ("topic print".equals(line)) {
                 System.out.println("Received Topics' name: ");
                 Iterator<Topic> it = topics.iterator();
@@ -252,7 +254,7 @@ public class App {
                         if (rightNeighbor != null && rightNeighbor.getIPAdress().isReachable(Settings.getInstance().getNodeTimeout()) == false) {
                             //neighbor is not reachable after 5 seconds
                             multicastPublisher.sendMessage(new HearbeatFailedMessage(topic, rightNeighbor, "HearbeatFailed",
-                                    InetAddress.getLocalHost().getHostAddress()));
+                                    IPAdress.getLocalIPAddress().getHostAddress()));
                         }
                     } catch (IOException e) {
                         System.out.println("A problem occured while executing hearbeat for topic: " + topic.getName());

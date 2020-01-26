@@ -1,6 +1,5 @@
 package app;
 
-import java.net.InetAddress;
 import java.util.UUID;
 import app.models.TopicNodeMessage;
 import app.models.Leader;
@@ -43,7 +42,7 @@ public class TopicNode {
                 multicastPublisher.sendMessageUnicast(rightNeighborInetAdress, new TopicNodeMessage(topic, this.uuid, true));                
                 
                 // Winner tells other nodes that its the new leader
-                Leader leader = new Leader(InetAddress.getLocalHost());
+                Leader leader = new Leader(IPAdress.getLocalIPAddress());
                 topic.setLeader(leader);                
                 multicastPublisher.announceTopic(topic);
             }            

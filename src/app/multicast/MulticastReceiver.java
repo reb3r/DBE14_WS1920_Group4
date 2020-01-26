@@ -9,6 +9,7 @@ import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
 
 import app.App;
+import app.IPAdress;
 import app.Log;
 import app.Settings;
 import app.TopicNode;
@@ -103,7 +104,7 @@ public class MulticastReceiver extends Thread {
                         Message message = (Message) object;
                         if (object instanceof SubscriptionMessage) {
                             Topic topic = message.getTopic();
-                            InetAddress localHostAdress = InetAddress.getLocalHost();
+                            InetAddress localHostAdress = IPAdress.getLocalIPAddress();
 
                             if (topic.getLeader().getIPAdress().equals(localHostAdress)) {
                                 System.out.println("Leader received SubscriptionMessage from sender: "
@@ -131,7 +132,7 @@ public class MulticastReceiver extends Thread {
                         } else if (object instanceof UnsubscriptionMessage) {
                             UnsubscriptionMessage unsubscriptionMessage = (UnsubscriptionMessage) message;
                             Topic topic = unsubscriptionMessage.getTopic();
-                            InetAddress localHostAdress = InetAddress.getLocalHost();
+                            InetAddress localHostAdress = IPAdress.getLocalIPAddress();
 
                             if (topic.getLeader().getIPAdress().equals(localHostAdress)) {
                                 System.out.println("Leader received UnsubscriptionMessage from sender: "
@@ -175,7 +176,7 @@ public class MulticastReceiver extends Thread {
                                 App.leftTopicNeighbours.replace(topic.getUUID(), currentLeftNeighbor, new LeftNeighbor(heartbeatSenderAdress));
 
                                 multicastPublisher.sendTopicNeighborUnicast(heartbeatSenderAdress.getHostAddress(),
-                                        new TopicNeighbor(topic, new RightNeighbor(InetAddress.getLocalHost()), new LeftNeighbor(null)));
+                                        new TopicNeighbor(topic, new RightNeighbor(IPAdress.getLocalIPAddress()), new LeftNeighbor(null)));
                             }
                         } else {
                             System.out.println("Received Message: " + message.getName() + " with topic "
