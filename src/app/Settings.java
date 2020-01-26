@@ -27,6 +27,18 @@ public class Settings {
         return 4446;
     }
 
+    public int getNodeTimeout() {
+        return 5000;
+    }
+    
+    public int getHearbeatDelay() {
+        return 20000;
+    }
+    
+    public int getHearbeatPeriod() {
+        return 20000;
+    }
+
     public int getLogLevel() {
         return Log.DEBUG;
     }

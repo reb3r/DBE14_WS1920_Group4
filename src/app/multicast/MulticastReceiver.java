@@ -12,10 +12,10 @@ import app.App;
 import app.Log;
 import app.Settings;
 import app.TopicNode;
+import app.models.HearbeatFailedMessage;
 import app.models.HoldbackQueue;
-import app.models.Leader;
+import app.models.LeftNeighbor;
 import app.models.Message;
-import app.models.NewTopicNeighborMessage;
 import app.models.TopicNodeMessage;
 import app.models.UnsubscriptionMessage;
 import app.models.RightNeighbor;
@@ -93,7 +93,7 @@ public class MulticastReceiver extends Thread {
                             App.topics.add(topic);
                         } else {
                             App.subscribedTopics.remove(topic);            
-                            App.topicNeighbours.remove(topic.getUUID());
+                            App.rightTopicNeighbours.remove(topic.getUUID());
                             App.topicNodes.remove(topic.getUUID());
                         }
                     }
@@ -111,16 +111,21 @@ public class MulticastReceiver extends Thread {
 
                                 InetAddress subscriberAdress = InetAddress.getByName(message.getContent());
 
-                                RightNeighbor rightNeighbor = App.topicNeighbours.replace(topic.getUUID(), new RightNeighbor(subscriberAdress));
+                                RightNeighbor myFormerRightNeighbor = App.rightTopicNeighbours.replace(topic.getUUID(), new RightNeighbor(subscriberAdress));
 
                                 String subscriberAdressString = subscriberAdress.getHostAddress();
                                 // Tell new node how to join the ring
-                                if (rightNeighbor != null) {
+                                if (myFormerRightNeighbor != null) {
                                     multicastPublisher.sendTopicNeighborUnicast(subscriberAdressString,
-                                            new TopicNeighbor(topic, rightNeighbor));
+                                            new TopicNeighbor(topic, myFormerRightNeighbor, new LeftNeighbor(localHostAdress)));
+
+                                    multicastPublisher.sendTopicNeighborUnicast(myFormerRightNeighbor.getIPAdress().getHostAddress(),
+                                            new TopicNeighbor(topic, null, new LeftNeighbor(subscriberAdress)));
                                 } else {
+                                    App.leftTopicNeighbours.put(topic.getUUID(), new LeftNeighbor(subscriberAdress));
+
                                     multicastPublisher.sendTopicNeighborUnicast(subscriberAdressString,
-                                            new TopicNeighbor(topic, new RightNeighbor(localHostAdress)));
+                                            new TopicNeighbor(topic, new RightNeighbor(localHostAdress), new LeftNeighbor(localHostAdress)));
                                 }
                             }
                         } else if (object instanceof UnsubscriptionMessage) {
@@ -134,19 +139,43 @@ public class MulticastReceiver extends Thread {
 
                                 InetAddress unsubscriberAdress = InetAddress.getByName(unsubscriptionMessage.getContent());
                                 
-                                RightNeighbor rightNeighbor = App.topicNeighbours.get(topic.getUUID());
+                                RightNeighbor myRightNeighbor = App.rightTopicNeighbours.get(topic.getUUID());
 
-                                if (unsubscriberAdress.equals(localHostAdress) && rightNeighbor == null ) {
+                                if (unsubscriberAdress.equals(localHostAdress) && myRightNeighbor == null ) {
                                     // last node leaves topic
                                     App.topics.remove(topic);
                                     continue;
                                 }
+                                
+                                RightNeighbor rightNeighborOfUnsubscriber = unsubscriptionMessage.getRightNeighbor();
+                                LeftNeighbor leftNeighborOfUnsubscriber = unsubscriptionMessage.getLeftNeighbor();
 
-                                RightNeighbor oldRightNeighbor = new RightNeighbor(unsubscriberAdress);
-                                RightNeighbor newRightNeighbor = unsubscriptionMessage.getRightNeighbor();
+                                if (rightNeighborOfUnsubscriber.getIPAdress().equals(leftNeighborOfUnsubscriber.getIPAdress())) {                                    
+                                    // When only two nodes are left and one leaves, the last node will receive null as new neighbors.
+                                    multicastPublisher.sendTopicNeighborUnicast(rightNeighborOfUnsubscriber.getIPAdress().getHostAddress(),
+                                    new TopicNeighbor(topic, null, null));
+                                } else {
+                                    multicastPublisher.sendTopicNeighborUnicast(rightNeighborOfUnsubscriber.getIPAdress().getHostAddress(),
+                                        new TopicNeighbor(topic, new RightNeighbor(null), leftNeighborOfUnsubscriber));
 
-                                // Tell the node whose neighbor is about to leave to set the neighbor of the leaving node as its new neighbor
-                                multicastPublisher.sendNewTopicNeighbor(new NewTopicNeighborMessage(topic, oldRightNeighbor, newRightNeighbor));                                
+                                    multicastPublisher.sendTopicNeighborUnicast(leftNeighborOfUnsubscriber.getIPAdress().getHostAddress(),
+                                        new TopicNeighbor(topic, rightNeighborOfUnsubscriber, new LeftNeighbor(null)));
+                                }                             
+                            }
+                        } else if (object instanceof HearbeatFailedMessage) {
+                            HearbeatFailedMessage hearbeatFailedMessage = (HearbeatFailedMessage) object;
+                            Topic topic = hearbeatFailedMessage.getTopic();          
+                            
+                            InetAddress heartbeatSenderAdress = InetAddress.getByName(hearbeatFailedMessage.getContent());                            
+                            InetAddress failedNeighborAdress = hearbeatFailedMessage.getMissingRightNeighbor().getIPAdress();
+                            
+                            LeftNeighbor currentLeftNeighbor = App.leftTopicNeighbours.get(topic.getUUID());
+
+                            if (currentLeftNeighbor.getIPAdress().equals(failedNeighborAdress)) {
+                                App.leftTopicNeighbours.replace(topic.getUUID(), currentLeftNeighbor, new LeftNeighbor(heartbeatSenderAdress));
+
+                                multicastPublisher.sendTopicNeighborUnicast(heartbeatSenderAdress.getHostAddress(),
+                                        new TopicNeighbor(topic, new RightNeighbor(InetAddress.getLocalHost()), new LeftNeighbor(null)));
                             }
                         } else {
                             System.out.println("Received Message: " + message.getName() + " with topic "
@@ -168,31 +197,28 @@ public class MulticastReceiver extends Thread {
                         topicNode.runLCR(nodeMessage, multicastPublisher);
                     }
 
-                    // Process neighbor replacement message
-                    if (object instanceof NewTopicNeighborMessage) {
-                        // Received message to replace current neighbor with a new one
-                        NewTopicNeighborMessage newTopicNeighborMessage = (NewTopicNeighborMessage) object;
-                        Topic topic = newTopicNeighborMessage.getTopic();
-
-                        if (newTopicNeighborMessage.getNewRightNeighbor().getIPAdress().equals(InetAddress.getLocalHost())) {
-                            // When only two nodes are left and one leaves, the last node will receive itself as new neighbor.
-                            App.topicNeighbours.put(topic.getUUID(), null);
-                            topic.setLeader(new Leader(InetAddress.getLocalHost()));
-                        } else {
-                            // Only replace neighbor if current neighbor matches the oldRightNeighbor who is about to be replaced
-                            if (App.topicNeighbours.get(topic.getUUID()).equals(newTopicNeighborMessage.getOldRightNeighbor())) {                            
-                                App.topicNeighbours.put(topic.getUUID(), newTopicNeighborMessage.getNewRightNeighbor());
-
-                                multicastPublisher.sendMessage(new RingCompleteMessage(topic));
-                            }
-                        }
-                    }
-
                     // Set neighbor for specific topic
                     if (object instanceof TopicNeighbor) {
                         TopicNeighbor topicNeighbor = (TopicNeighbor) object;
 
-                        App.topicNeighbours.put(topicNeighbor.getTopic().getUUID(), topicNeighbor.getNeighbor());
+                        RightNeighbor rightNeighbor = topicNeighbor.getRightNeighbor();
+                        LeftNeighbor leftNeighbor = topicNeighbor.getLeftNeighbor();
+
+                        if (rightNeighbor != null) {
+                            if (rightNeighbor.getIPAdress() != null) {
+                                App.rightTopicNeighbours.put(topicNeighbor.getTopic().getUUID(), topicNeighbor.getRightNeighbor());
+                            }
+                        } else {                            
+                            App.rightTopicNeighbours.put(topicNeighbor.getTopic().getUUID(), null);
+                        }
+
+                        if (leftNeighbor != null) {
+                            if (leftNeighbor.getIPAdress() != null) {
+                                App.leftTopicNeighbours.put(topicNeighbor.getTopic().getUUID(), topicNeighbor.getLeftNeighbor());
+                            }
+                        } else {                            
+                            App.leftTopicNeighbours.put(topicNeighbor.getTopic().getUUID(), null);
+                        }
 
                         // notify all nodes that ring is complete
                         multicastPublisher.sendMessage(new RingCompleteMessage(topicNeighbor.getTopic()));
@@ -214,7 +240,7 @@ public class MulticastReceiver extends Thread {
 
                         // Start leader election. Send message to right neighbor.
                         TopicNodeMessage nodeMessage = new TopicNodeMessage(topic, topicNode.getUUID(), false);
-                        multicastPublisher.sendMessageUnicast(App.topicNeighbours.get(topic.getUUID()).getIPAdress().getHostAddress(), nodeMessage);
+                        multicastPublisher.sendMessageUnicast(App.rightTopicNeighbours.get(topic.getUUID()).getIPAdress().getHostAddress(), nodeMessage);
                     }
                 }
             }

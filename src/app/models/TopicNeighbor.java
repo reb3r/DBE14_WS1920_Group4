@@ -19,11 +19,17 @@ public class TopicNeighbor implements Serializable {
     /**
      * IP adress of right neighbor
      */
-    private RightNeighbor neighbor;
+    private RightNeighbor rightNeighbor;
 
-    public TopicNeighbor(Topic topic, RightNeighbor neighbor) {
+     /**
+     * IP adress of left neighbor
+     */
+    private LeftNeighbor leftNeighbor;
+
+    public TopicNeighbor(Topic topic, RightNeighbor rightNeighbor, LeftNeighbor leftNeighbor) {
         this.topic = topic;
-        this.neighbor = neighbor;
+        this.rightNeighbor = rightNeighbor;
+        this.leftNeighbor = leftNeighbor;
     }
 
     public Topic getTopic() {
@@ -34,11 +40,19 @@ public class TopicNeighbor implements Serializable {
         this.topic = topic;
     }
 
-    public RightNeighbor getNeighbor() {
-        return this.neighbor;
+    public RightNeighbor getRightNeighbor() {
+        return this.rightNeighbor;
     }
 
-    public void setNeighbor(RightNeighbor neighbor) {
-        this.neighbor = neighbor;
+    public void setRightNeighbor(RightNeighbor rightNeighbor) {
+        this.rightNeighbor = rightNeighbor;
+    }
+
+    public LeftNeighbor getLeftNeighbor() {
+        return this.leftNeighbor;
+    }
+
+    public void setLeftNeighbor(LeftNeighbor leftNeighbor) {
+        this.leftNeighbor = leftNeighbor;
     }
 }

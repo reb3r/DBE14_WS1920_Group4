@@ -15,7 +15,6 @@ import app.Settings;
 import app.interfaces.MessageInterface;
 import app.models.Topic;
 import app.models.TopicNeighbor;
-import app.models.NewTopicNeighborMessage;
 import app.models.Request;
 import app.models.RetransmissionRequest;
 
@@ -119,11 +118,6 @@ public class MulticastPublisher {
         socket.close();
     }
 
-    /**
-     * Should not be used. Only for testing...
-     * 
-     * @deprecated
-     */
     public void unicastObject(String address, Object object) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ObjectOutputStream out = new ObjectOutputStream(baos);
@@ -144,10 +138,6 @@ public class MulticastPublisher {
 
     public void sendTopicNeighborUnicast(String address, TopicNeighbor topicNeighbor) throws IOException {
         unicastObject(address, topicNeighbor);
-    }
-
-    public void sendNewTopicNeighbor(NewTopicNeighborMessage newTopicNeighborMessage) throws IOException {
-        multicastObject(newTopicNeighborMessage);
     }
 
     /**

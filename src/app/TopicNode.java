@@ -21,7 +21,7 @@ public class TopicNode {
     public void runLCR (TopicNodeMessage msg, MulticastPublisher multicastPublisher) {
         try {
             Topic topic = msg.getTopic();
-            String rightNeighborInetAdress = App.topicNeighbours.get(topic.getUUID()).getIPAdress().getHostAddress();
+            String rightNeighborInetAdress = App.rightTopicNeighbours.get(topic.getUUID()).getIPAdress().getHostAddress();
 
             if (msg.getIsLeader()){
                 leader_uuid = msg.getUUID();

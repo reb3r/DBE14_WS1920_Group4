@@ -8,7 +8,9 @@ public class UnsubscriptionMessage extends Message {
 
     private RightNeighbor rightNeighbor;
 
-    public UnsubscriptionMessage(Topic topic, RightNeighbor rightNeighbor, String name, String content) {
+    private LeftNeighbor leftNeighbor;
+
+    public UnsubscriptionMessage(Topic topic, RightNeighbor rightNeighbor, LeftNeighbor leftNeighbor, String name, String content) {
         super(topic, name, content);
 
         this.rightNeighbor = rightNeighbor;
@@ -16,5 +18,9 @@ public class UnsubscriptionMessage extends Message {
     
     public RightNeighbor getRightNeighbor() {
         return this.rightNeighbor;
+    }
+
+    public LeftNeighbor getLeftNeighbor() {
+        return this.leftNeighbor;
     }
 }

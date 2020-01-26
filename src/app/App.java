@@ -9,6 +9,8 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 
 import app.models.Message;
@@ -16,30 +18,33 @@ import app.models.RightNeighbor;
 import app.models.SubscriptionMessage;
 import app.models.Topic;
 import app.models.UnsubscriptionMessage;
+import app.models.HearbeatFailedMessage;
 import app.models.Leader;
+import app.models.LeftNeighbor;
 import app.multicast.MulticastPublisher;
 import app.multicast.MulticastReceiver;
 
 public class App {
-
-    // public static List<Request> requests = new LinkedList<>();
+    private static Timer timer;
 
     public static List<Topic> topics = new LinkedList<>();
     public static List<Topic> subscribedTopics = new LinkedList<>();
 
     public static Map<UUID, TopicNode> topicNodes = new HashMap<UUID, TopicNode>(); // Save node information for each
                                                                                     // subscribed topic
-    public static Map<UUID, RightNeighbor> topicNeighbours = new HashMap<UUID, RightNeighbor>(); // Save neighbor for
-                                                                                                 // each subscribed
-                                                                                                 // topic
+    // Save neighbors for each subscribed topic
+    public static Map<UUID, RightNeighbor> rightTopicNeighbours = new HashMap<UUID, RightNeighbor>(); 
+    public static Map<UUID, LeftNeighbor> leftTopicNeighbours = new HashMap<UUID, LeftNeighbor>();
 
-    public static List<Message> messages = new LinkedList<>();
+    public static List<Message> messages = new LinkedList<>();    
 
     public static void main(String[] args) throws Exception {
         MulticastReceiver multicastReceiver = new MulticastReceiver();
         multicastReceiver.start();
 
         MulticastPublisher multicastPublisher = MulticastPublisher.getInstance();
+
+        timer = new Timer();
 
         // CLI Loop
         while (true) {
@@ -83,11 +88,14 @@ public class App {
                 Topic topic = new Topic(topicName);                
                 topic.setLeader(leader);
                                
-                topicNeighbours.put(topic.getUUID(), null);
+                rightTopicNeighbours.put(topic.getUUID(), null);
+                leftTopicNeighbours.put(topic.getUUID(), null);
                 
                 subscribedTopics.add(topic); // a topic creator is automatically subscribed to the topic
 
                 multicastPublisher.announceTopic(topic);
+                
+                InitHeartbeat(multicastPublisher, topic);
             } else if ("topic delete".equals(line)) {
                 if (subscribedTopics.size() < 1) {
                     System.out.println("You are not subscribed to any topic. You can only delete topics which you are subscribed to.");
@@ -179,8 +187,10 @@ public class App {
                 if (topic == null) { continue; }
 
                 subscribedTopics.remove(topic);
-                multicastPublisher.sendMessage(new UnsubscriptionMessage(topic, App.topicNeighbours.get(topic.getUUID()),
-                        "Unsubscribed", InetAddress.getLocalHost().getHostAddress()));
+                RightNeighbor rightNeighbor = App.rightTopicNeighbours.get(topic.getUUID());
+                LeftNeighbor leftNeighbor = App.leftTopicNeighbours.get(topic.getUUID());
+                multicastPublisher.sendMessage(new UnsubscriptionMessage(topic, rightNeighbor, leftNeighbor,
+                            "Unsubscribed", InetAddress.getLocalHost().getHostAddress()));
             } else if ("topic print".equals(line)) {
                 System.out.println("Received Topics' name: ");
                 Iterator<Topic> it = topics.iterator();
@@ -230,6 +240,26 @@ public class App {
                 System.out.println("Did not understand that command. Use 'help' for further assistance.");
             }
         }
+    }
+
+    private static void InitHeartbeat(MulticastPublisher multicastPublisher, Topic topic) {
+        //Create seperate heartbeat for each topic
+        timer.scheduleAtFixedRate(new TimerTask() {        
+            @Override
+            public void run() {
+                    try {
+                        RightNeighbor rightNeighbor = rightTopicNeighbours.get(topic.getUUID());
+                        if (rightNeighbor != null && rightNeighbor.getIPAdress().isReachable(Settings.getInstance().getNodeTimeout()) == false) {
+                            //neighbor is not reachable after 5 seconds
+                            multicastPublisher.sendMessage(new HearbeatFailedMessage(topic, rightNeighbor, "HearbeatFailed",
+                                    InetAddress.getLocalHost().getHostAddress()));
+                        }
+                    } catch (IOException e) {
+                        System.out.println("A problem occured while executing hearbeat for topic: " + topic.getName());
+                        e.printStackTrace();
+                    }
+                }                        
+            }, Settings.getInstance().getHearbeatDelay(), Settings.getInstance().getHearbeatPeriod());
     }
 
     private static boolean existsTopicWithName(String name) {
