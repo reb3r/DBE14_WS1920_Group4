@@ -1,7 +1,9 @@
 package app.models;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetAddress;
+import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.UUID;
 
@@ -36,8 +38,11 @@ public class Request implements Serializable {
         this.payload = payload;
         this.sequenceId = sequenceId;
         try {
-            this.sender = InetAddress.getLocalHost();
-        } catch (UnknownHostException e) {
+            Socket s = new Socket("www.google.com", 80);
+            InetAddress localHostAdress = s.getLocalAddress();
+            s.close();
+            this.sender = localHostAdress;
+        } catch (IOException e) {
             // do nothing....
         }
     }

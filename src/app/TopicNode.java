@@ -1,6 +1,7 @@
 package app;
 
 import java.net.InetAddress;
+import java.net.Socket;
 import java.util.UUID;
 import app.models.TopicNodeMessage;
 import app.models.Leader;
@@ -30,7 +31,11 @@ public class TopicNode {
                 }
                 
                 // Winner tells other nodes that its the new leader
-                Leader leader = new Leader(InetAddress.getLocalHost());
+                Socket s = new Socket("www.google.com", 80);
+                InetAddress localHostAdress = s.getLocalAddress();
+                s.close();
+                
+                Leader leader = new Leader(localHostAdress);
                 topic.setLeader(leader);                
                 multicastPublisher.announceTopic(topic);
 
