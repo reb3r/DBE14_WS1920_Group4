@@ -5,6 +5,8 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.UUID;
 
+import app.IPAdress;
+
 public class Request implements Serializable {
 
     /**
@@ -35,11 +37,7 @@ public class Request implements Serializable {
     public Request(Object payload, int sequenceId) {
         this.payload = payload;
         this.sequenceId = sequenceId;
-        try {
-            this.sender = InetAddress.getLocalHost();
-        } catch (UnknownHostException e) {
-            // do nothing....
-        }
+        this.sender = IPAdress.getLocalIPAddress();
     }
 
     public Request(Object payload, int sequenceId, InetAddress sender, UUID senderUuid) {

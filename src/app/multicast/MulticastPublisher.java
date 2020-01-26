@@ -123,8 +123,9 @@ public class MulticastPublisher {
         ObjectOutputStream out = new ObjectOutputStream(baos);
 
         // Increment sequenceId by one
-        sequenceId = sequenceId + 1;
-        Request request = new Request(object, sequenceId);
+        // Update: Do not increment in unicast and send -1....
+        // sequenceId = sequenceId + 1;
+        Request request = new Request(object, -1);
         request.setSenderUuid(this.senderUuid);
 
         out.writeObject(request);
