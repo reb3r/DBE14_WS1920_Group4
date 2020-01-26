@@ -110,17 +110,17 @@ public class MulticastReceiver extends Thread {
                                         + message.getContent() + " to topic " + topic.getName());
 
                                 InetAddress subscriberAdress = InetAddress.getByName(message.getContent());
+                                String subscriberAdressString = subscriberAdress.getHostAddress();
 
                                 RightNeighbor myFormerRightNeighbor = App.rightTopicNeighbours.replace(topic.getUUID(), new RightNeighbor(subscriberAdress));
 
-                                String subscriberAdressString = subscriberAdress.getHostAddress();
                                 // Tell new node how to join the ring
                                 if (myFormerRightNeighbor != null) {
                                     multicastPublisher.sendTopicNeighborUnicast(subscriberAdressString,
                                             new TopicNeighbor(topic, myFormerRightNeighbor, new LeftNeighbor(localHostAdress)));
 
                                     multicastPublisher.sendTopicNeighborUnicast(myFormerRightNeighbor.getIPAdress().getHostAddress(),
-                                            new TopicNeighbor(topic, null, new LeftNeighbor(subscriberAdress)));
+                                            new TopicNeighbor(topic, new RightNeighbor(null), new LeftNeighbor(subscriberAdress)));
                                 } else {
                                     App.leftTopicNeighbours.put(topic.getUUID(), new LeftNeighbor(subscriberAdress));
 

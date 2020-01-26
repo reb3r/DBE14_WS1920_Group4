@@ -25,14 +25,9 @@ public class TopicNode {
 
             if (msg.getIsLeader()){
                 leader_uuid = msg.getUUID();
-                if (msg.getUUID().equals(this.uuid) == false){
-                    multicastPublisher.sendMessageUnicast(rightNeighborInetAdress, new TopicNodeMessage(topic, leader_uuid, true));
+                if (leader_uuid.equals(this.uuid) == false){
+                    multicastPublisher.sendMessageUnicast(rightNeighborInetAdress, msg);
                 }
-                
-                // Winner tells other nodes that its the new leader
-                Leader leader = new Leader(InetAddress.getLocalHost());
-                topic.setLeader(leader);                
-                multicastPublisher.announceTopic(topic);
 
                 return;
             }
@@ -45,7 +40,12 @@ public class TopicNode {
             else if (compareResult == 0) {
                 //received own election message. Anounce self as leader.
                 leader_uuid = this.uuid;
-                multicastPublisher.sendMessageUnicast(rightNeighborInetAdress, new TopicNodeMessage(topic, this.uuid, true));
+                multicastPublisher.sendMessageUnicast(rightNeighborInetAdress, new TopicNodeMessage(topic, this.uuid, true));                
+                
+                // Winner tells other nodes that its the new leader
+                Leader leader = new Leader(InetAddress.getLocalHost());
+                topic.setLeader(leader);                
+                multicastPublisher.announceTopic(topic);
             }            
         } catch (Exception e) {            
             System.out.println("Unknown Exception while processing node message data: " + e.getMessage());
