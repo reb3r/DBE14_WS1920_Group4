@@ -7,6 +7,7 @@ import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
+import java.net.Socket;
 
 import app.App;
 import app.Log;
@@ -103,7 +104,10 @@ public class MulticastReceiver extends Thread {
                         Message message = (Message) object;
                         if (object instanceof SubscriptionMessage) {
                             Topic topic = message.getTopic();
-                            InetAddress localHostAdress = InetAddress.getLocalHost();
+                            
+                            Socket s = new Socket("www.google.com", 80);
+                            InetAddress localHostAdress = s.getLocalAddress();
+                            s.close();
 
                             if (topic.getLeader().getIPAdress().equals(localHostAdress)) {
                                 System.out.println("Leader received SubscriptionMessage from sender: "
