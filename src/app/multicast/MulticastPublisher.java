@@ -15,6 +15,7 @@ import app.Settings;
 import app.interfaces.MessageInterface;
 import app.models.Topic;
 import app.models.TopicNeighbor;
+import app.models.UnicastRequest;
 import app.models.Request;
 import app.models.RetransmissionRequest;
 
@@ -125,7 +126,7 @@ public class MulticastPublisher {
         // Increment sequenceId by one
         // Update: Do not increment in unicast and send -1....
         // sequenceId = sequenceId + 1;
-        Request request = new Request(object, -1);
+        UnicastRequest request = new UnicastRequest(object, -1);
         request.setSenderUuid(this.senderUuid);
 
         out.writeObject(request);
